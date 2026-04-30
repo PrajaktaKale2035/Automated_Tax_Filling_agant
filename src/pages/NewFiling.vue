@@ -1,71 +1,73 @@
 <template>
   <DynamicLayoutContainer>
     <div class="max-w-4xl mx-auto space-y-6">
-      <!-- Page Header -->
       <BackButton />
       <div class="space-y-2">
-        <h1 class="text-3xl font-bold">New Tax Filing</h1>
-        <p class="text-muted-foreground">Start your tax filing journey with our AI-powered assistant</p>
+        <h1 class="text-3xl font-bold">New ITR Filing</h1>
+        <p class="text-muted-foreground">Choose Assessment Year and ITR form to start.</p>
       </div>
 
-      <!-- Filing Year Selection -->
       <Card>
         <CardHeader>
-          <CardTitle>Select Filing Year</CardTitle>
+          <CardTitle>Assessment Year</CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button 
-              v-for="year in [2024, 2023, 2022]" :key="year"
-              @click="selectedYear = year"
+            <button
+              v-for="ay in assessmentYears" :key="ay.value"
+              @click="selectedAY = ay.value"
+              :disabled="ay.disabled"
               :class="cn(
-                'p-4 rounded-lg border-2 transition-all',
-                selectedYear === year 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border hover:border-primary/50'
+                'p-4 rounded-lg border-2 transition-all text-left',
+                selectedAY === ay.value
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50',
+                ay.disabled ? 'opacity-50 cursor-not-allowed' : ''
               )"
             >
-              <div class="text-lg font-semibold">{{ year }}</div>
-              <div class="text-sm text-muted-foreground">Tax Year</div>
+              <div class="text-lg font-semibold">AY {{ ay.value }}</div>
+              <div class="text-sm text-muted-foreground">FY {{ ay.fy }}</div>
+              <div v-if="ay.disabled" class="text-xs text-amber-600 mt-1">Coming soon</div>
             </button>
           </div>
         </CardContent>
       </Card>
 
-      <!-- Filing Status -->
       <Card>
         <CardHeader>
-          <CardTitle>Filing Status</CardTitle>
+          <CardTitle>ITR Form</CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button 
-              v-for="status in filingStatuses" :key="status.value"
-              @click="selectedStatus = status.value"
+            <button
+              v-for="form in itrForms" :key="form.value"
+              @click="selectedForm = form.value"
+              :disabled="form.disabled"
               :class="cn(
                 'p-4 rounded-lg border-2 transition-all text-left',
-                selectedStatus === status.value 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border hover:border-primary/50'
+                selectedForm === form.value
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50',
+                form.disabled ? 'opacity-50 cursor-not-allowed' : ''
               )"
             >
-              <div class="font-semibold">{{ status.label }}</div>
-              <div class="text-sm text-muted-foreground">{{ status.description }}</div>
+              <div class="font-semibold">{{ form.label }}</div>
+              <div class="text-sm text-muted-foreground">{{ form.description }}</div>
+              <div v-if="form.disabled" class="text-xs text-amber-600 mt-1">Not yet supported</div>
             </button>
           </div>
         </CardContent>
       </Card>
 
-      <!-- Action Buttons -->
       <div class="flex gap-4">
         <Button variant="outline" size="lg" @click="router.push('/dashboard')" class="flex-1">
           <ArrowLeft class="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>
-        <Button 
-          size="lg" 
-          @click="startFiling" 
-          :disabled="!selectedYear || !selectedStatus"
+        <Button
+          size="lg"
+          @click="startFiling"
+          :disabled="!selectedAY || !selectedForm"
           class="flex-1"
         >
           Start Filing
@@ -94,30 +96,35 @@ import { useAuthStore } from '@/stores/authStore'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const selectedYear = ref<number | null>(2024)
-const selectedStatus = ref<string | null>(null)
+const selectedAY = ref<string | null>('2025-26')
+const selectedForm = ref<string | null>(null)
 
-const filingStatuses = [
-  { value: 'single', label: 'Single', description: 'Filing as an individual' },
-  { value: 'married_joint', label: 'Married Filing Jointly', description: 'Filing with spouse' },
-  { value: 'married_separate', label: 'Married Filing Separately', description: 'Filing separately from spouse' },
-  { value: 'head_household', label: 'Head of Household', description: 'Filing as head of household' },
+const assessmentYears = [
+  { value: '2025-26', fy: '2024-25', disabled: false },
+  { value: '2024-25', fy: '2023-24', disabled: true },
+  { value: '2023-24', fy: '2022-23', disabled: true },
+]
+
+const itrForms = [
+  { value: 'ITR-1', label: 'ITR-1 (Sahaj)', description: 'Salary, one house property, other sources up to Rs 50L', disabled: false },
+  { value: 'ITR-2', label: 'ITR-2', description: 'Capital gains, multiple properties, foreign income', disabled: true },
+  { value: 'ITR-3', label: 'ITR-3', description: 'Income from business or profession', disabled: true },
+  { value: 'ITR-4', label: 'ITR-4 (Sugam)', description: 'Presumptive income for small business / profession', disabled: true },
 ]
 
 const startFiling = () => {
-  if (selectedYear.value && selectedStatus.value) {
-    if (authStore.mode === 'expert') {
-      router.push('/filing/grid')
-    } else {
-      router.push({ 
-        path: '/filing/wizard',
-        query: { 
-          context: 'new_filing',
-          year: selectedYear.value,
-          status: selectedStatus.value
-        }
-      })
-    }
+  if (!selectedAY.value || !selectedForm.value) return
+  if (authStore.mode === 'expert') {
+    router.push('/filing/grid')
+  } else {
+    router.push({
+      path: '/filing/wizard',
+      query: {
+        context: 'new_filing',
+        ay: selectedAY.value,
+        form: selectedForm.value,
+      },
+    })
   }
 }
 </script>
