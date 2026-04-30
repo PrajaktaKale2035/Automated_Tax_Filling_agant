@@ -3,6 +3,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -76,13 +77,28 @@ async def add_process_time_header(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle validation errors with detailed messages."""
+    """Surface Pydantic validation errors as 422.
+
+    Pydantic v2 includes the original exception object in `ctx.error` for
+    validator-raised errors. We run jsonable_encoder to drop non-serializable
+    ValueError instances and then promote the first user-friendly message to
+    the top level so the frontend can display it directly.
+    """
+    raw_errors = jsonable_encoder(exc.errors())
+    first_msg = ""
+    for err in raw_errors:
+        if isinstance(err, dict) and err.get("msg"):
+            first_msg = err["msg"]
+            # Strip the "Value error, " prefix that Pydantic adds.
+            if first_msg.startswith("Value error, "):
+                first_msg = first_msg[len("Value error, "):]
+            break
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
-            "detail": exc.errors(),
-            "message": "Validation error - please check your input"
-        }
+            "detail": first_msg or "Validation error - please check your input",
+            "errors": raw_errors,
+        },
     )
 
 

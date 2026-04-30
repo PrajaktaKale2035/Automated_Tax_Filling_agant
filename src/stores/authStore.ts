@@ -14,31 +14,41 @@ export const useAuthStore = defineStore('auth', () => {
     const isAuthenticated = computed(() => !!token.value)
 
     async function login(email: string, password: string) {
-        const formData = new FormData()
-        formData.append('username', email)
-        formData.append('password', password)
+        // Backend's OAuth2 login expects application/x-www-form-urlencoded.
+        const body = new URLSearchParams()
+        body.append('username', email)
+        body.append('password', password)
 
         const response = await fetch('http://localhost:8000/api/auth/login', {
             method: 'POST',
-            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
         })
 
         if (!response.ok) {
-            const error = await response.json()
+            const error = await response.json().catch(() => ({}))
             throw new Error(error.detail || 'Login failed')
         }
 
         const data = await response.json()
-
         token.value = data.access_token
-        user.value = {
-            id: data.user_id,
-            email: data.email,
-            full_name: data.full_name
-        }
-
         localStorage.setItem('token', data.access_token)
-        localStorage.setItem('user', JSON.stringify(user.value))
+
+        // The login response only carries the bearer token; fetch the user
+        // record so we know id / email / full_name for routing and filing
+        // filtering.
+        const meResp = await fetch('http://localhost:8000/api/auth/me', {
+            headers: { Authorization: `Bearer ${data.access_token}` },
+        })
+        if (meResp.ok) {
+            const me = await meResp.json()
+            user.value = {
+                id: me.id,
+                email: me.email,
+                full_name: me.full_name || '',
+            }
+            localStorage.setItem('user', JSON.stringify(user.value))
+        }
     }
 
     function logout() {

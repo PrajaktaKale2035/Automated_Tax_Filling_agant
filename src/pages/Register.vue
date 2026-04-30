@@ -31,12 +31,15 @@
           </div>
           <div class="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input 
-              id="password" 
-              type="password" 
+            <Input
+              id="password"
+              type="password"
               v-model="password"
-              required 
+              required
             />
+            <p class="text-xs text-muted-foreground">
+              Minimum 8 characters, at least one uppercase letter and one digit.
+            </p>
           </div>
           <div v-if="error" class="text-sm text-destructive text-center">
             {{ error }}

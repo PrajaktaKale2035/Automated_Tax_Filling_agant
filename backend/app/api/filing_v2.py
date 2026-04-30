@@ -233,6 +233,66 @@ def get_filing_json(filing_id: int, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Filings list (Phase 4 cleanup)
+# ---------------------------------------------------------------------------
+
+@router.get("/filings")
+def list_filings(user_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """List all ITR-1 filings, optionally filtered by user_id.
+
+    Returns rows in descending creation order. Currently unauthenticated; use
+    `user_id` query to filter to a specific user. Add auth in Phase 4+.
+    """
+    query = db.query(ITR1Filing).order_by(ITR1Filing.created_at.desc())
+    if user_id is not None:
+        query = query.filter(ITR1Filing.user_id == user_id)
+    rows = query.limit(100).all()
+    return [
+        {
+            "id": r.id,
+            "user_id": r.user_id,
+            "form16_id": r.form16_id,
+            "assessment_year": r.assessment_year,
+            "regime": r.regime,
+            "status": r.status,
+            "gross_income": int(r.gross_income or 0),
+            "taxable_income": int(r.taxable_income or 0),
+            "total_tax": int(r.total_tax or 0),
+            "tds_paid": int(r.tds_paid or 0),
+            "refund_due": int(r.refund_due or 0),
+            "tax_due": int(r.tax_due or 0),
+            "pdf_path": r.pdf_path,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# RAG inspection - direct similarity search for debugging / UI
+# ---------------------------------------------------------------------------
+
+@router.get("/rag/search")
+def rag_search(q: str, k: int = 5, topic: Optional[str] = None):
+    """Run a similarity search against the pgvector itr_rulebook collection.
+
+    Useful for debugging the RAG pipeline and for building UI surfaces that
+    show the user which rulebook chunks grounded a calculation.
+    """
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="query 'q' must not be empty")
+    from app.rag.retriever import TaxRetriever
+    retriever = TaxRetriever()
+    chunks = retriever.retrieve(q, k=k, topic_filter=topic)
+    return {
+        "query": q,
+        "k": k,
+        "topic_filter": topic,
+        "results": [c.to_dict() for c in chunks],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Filing Status
 # ---------------------------------------------------------------------------
 

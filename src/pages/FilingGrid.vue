@@ -6,16 +6,31 @@
           <BackButton />
           <div>
             <h1 class="text-2xl font-bold">Expert Filing Mode</h1>
-            <p class="text-sm text-muted-foreground">Direct data entry for ITR-1 (AY 2024-25)</p>
+            <p class="text-sm text-muted-foreground">Direct entry for ITR-1 (FY 2024-25 / AY 2025-26)</p>
           </div>
         </div>
         <div class="flex gap-2">
-          <Button variant="outline">Save Draft</Button>
-          <Button>Validate & File</Button>
+          <Button variant="outline" :disabled="submitting" @click="recomputeNow">Recompute</Button>
+          <Button :disabled="submitting" @click="submitFiling">
+            {{ submitting ? 'Submitting...' : 'Validate & File' }}
+          </Button>
         </div>
       </div>
 
-      <!-- Schedule Tabs -->
+      <div class="flex gap-2">
+        <button
+          @click="formData.regime = 'old'"
+          :class="cn('px-3 py-1 rounded-full text-xs border',
+            formData.regime === 'old' ? 'bg-primary text-primary-foreground border-primary' : 'border-input')"
+        >Old regime</button>
+        <button
+          @click="formData.regime = 'new'"
+          :class="cn('px-3 py-1 rounded-full text-xs border',
+            formData.regime === 'new' ? 'bg-primary text-primary-foreground border-primary' : 'border-input')"
+        >New regime</button>
+      </div>
+
+      <!-- Tabs -->
       <div class="flex border-b overflow-x-auto">
         <button
           v-for="tab in tabs"
@@ -23,19 +38,16 @@
           @click="activeTab = tab.id"
           :class="cn(
             'px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-            activeTab === tab.id
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+            activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
           )"
         >
           {{ tab.label }}
         </button>
       </div>
 
-      <!-- Grid Content -->
       <Card class="min-h-[500px]">
         <CardContent class="p-6">
-          <!-- General Information -->
+          <!-- General -->
           <div v-if="activeTab === 'general'" class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="space-y-2">
               <Label>First Name</Label>
@@ -51,7 +63,7 @@
             </div>
             <div class="space-y-2">
               <Label>PAN</Label>
-              <Input v-model="formData.general.pan" uppercase />
+              <Input v-model="formData.general.pan" />
             </div>
             <div class="space-y-2">
               <Label>Aadhaar Number</Label>
@@ -63,64 +75,71 @@
             </div>
           </div>
 
-          <!-- Salary Schedule -->
+          <!-- Salary -->
           <div v-if="activeTab === 'salary'" class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div class="space-y-2">
-                <Label>Gross Salary (Section 17(1))</Label>
-                <Input type="number" v-model="formData.salary.gross" />
+                <Label>Gross Salary u/s 17(1)</Label>
+                <Input type="number" v-model.number="formData.salary.gross" />
               </div>
               <div class="space-y-2">
-                <Label>Value of Perquisites (Section 17(2))</Label>
-                <Input type="number" v-model="formData.salary.perquisites" />
-              </div>
-              <div class="space-y-2">
-                <Label>Profits in lieu of salary (Section 17(3))</Label>
-                <Input type="number" v-model="formData.salary.profits" />
+                <Label>TDS deducted</Label>
+                <Input type="number" v-model.number="formData.salary.tds" />
               </div>
             </div>
-            <div class="border-t pt-4">
-              <h3 class="font-semibold mb-4">Allowances (Section 10)</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-2">
-                  <Label>HRA (10(13A))</Label>
-                  <Input type="number" v-model="formData.salary.hra" />
-                </div>
-                <div class="space-y-2">
-                  <Label>LTA (10(5))</Label>
-                  <Input type="number" v-model="formData.salary.lta" />
-                </div>
-              </div>
-            </div>
+            <p class="text-xs text-muted-foreground">
+              Indian ITR-1 doesn't include perquisites / profits in lieu separately at this granularity. Bundle them into Gross Salary above.
+            </p>
           </div>
 
           <!-- Deductions -->
           <div v-if="activeTab === 'deductions'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-2">
-              <Label>80C (LIC, PPF, etc.)</Label>
-              <Input type="number" v-model="formData.deductions.section80c" />
+            <div v-if="formData.regime === 'new'" class="md:col-span-2 p-3 rounded bg-blue-50 text-blue-700 text-sm">
+              New regime: deductions below are ignored by the tax engine. Standard deduction (Rs 75,000) is applied automatically.
             </div>
             <div class="space-y-2">
-              <Label>80D (Health Insurance)</Label>
-              <Input type="number" v-model="formData.deductions.section80d" />
+              <Label>80C (PPF, ELSS, LIC, ...)</Label>
+              <Input type="number" v-model.number="formData.deductions.section80c" />
+              <p class="text-xs text-muted-foreground">Cap Rs 1,50,000 (engine caps automatically).</p>
             </div>
             <div class="space-y-2">
-              <Label>80TTA (Interest on Savings)</Label>
-              <Input type="number" v-model="formData.deductions.section80tta" />
+              <Label>80D (Health insurance)</Label>
+              <Input type="number" v-model.number="formData.deductions.section80d" />
+              <p class="text-xs text-muted-foreground">Cap Rs 25,000 self / Rs 50,000 senior.</p>
             </div>
           </div>
 
-          <!-- Taxes -->
-          <div v-if="activeTab === 'taxes'" class="space-y-6">
-            <div class="bg-muted p-4 rounded-lg">
-              <div class="flex justify-between items-center mb-2">
-                <span>Total Income</span>
-                <span class="font-bold">₹{{ calculateTotalIncome() }}</span>
+          <!-- Tax computation: real, from backend -->
+          <div v-if="activeTab === 'taxes'" class="space-y-4">
+            <div v-if="previewError" class="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              {{ previewError }}
+            </div>
+            <div v-else-if="previewLoading" class="text-center py-8 text-muted-foreground">
+              Calling tax engine...
+            </div>
+            <div v-else-if="preview" class="bg-muted p-4 rounded-lg space-y-2">
+              <Row label="Regime" :raw="preview.regime.toUpperCase()" />
+              <Row label="FY" :raw="preview.fy" />
+              <Row label="Gross Income" :value="preview.gross_income" />
+              <Row label="Taxable Income" :value="preview.taxable_income" />
+              <Row label="Slab Tax" :value="preview.slab_tax" />
+              <Row label="Rebate u/s 87A" :value="preview.rebate_87a" :negative="true" />
+              <Row label="Surcharge" :value="preview.surcharge" />
+              <Row label="Cess (4%)" :value="preview.cess" />
+              <div class="flex justify-between pt-3 mt-3 border-t font-semibold">
+                <span>Total Tax</span>
+                <span class="font-mono">&#8377;{{ preview.total_tax.toLocaleString('en-IN') }}</span>
               </div>
-              <div class="flex justify-between items-center mb-2">
-                <span>Tax Payable</span>
-                <span class="font-bold">₹{{ calculateTax() }}</span>
+              <Row label="TDS already paid" :value="formData.salary.tds" :negative="true" />
+              <div class="flex justify-between pt-2 border-t">
+                <span class="font-semibold">{{ netDue >= 0 ? 'Tax Due' : 'Refund' }}</span>
+                <span :class="cn('font-mono font-bold', netDue > 0 ? 'text-red-600' : 'text-green-600')">
+                  &#8377;{{ Math.abs(netDue).toLocaleString('en-IN') }}
+                </span>
               </div>
+            </div>
+            <div v-if="submitError" class="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              {{ submitError }}
             </div>
           </div>
         </CardContent>
@@ -130,7 +149,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, h, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { cn } from '@/lib/utils'
 import DynamicLayoutContainer from '@/components-vue/dynamic/DynamicLayoutContainer.vue'
 import BackButton from '@/components-vue/navigation/BackButton.vue'
@@ -139,53 +159,148 @@ import Card from '@/components-vue/ui/Card.vue'
 import CardContent from '@/components-vue/ui/CardContent.vue'
 import Input from '@/components-vue/ui/Input.vue'
 import Label from '@/components-vue/ui/Label.vue'
+import { useAuthStore } from '@/stores/authStore'
+
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+
+const router = useRouter()
+const authStore = useAuthStore()
 
 const activeTab = ref('general')
-
 const tabs = [
-  { id: 'general', label: 'General Information' },
-  { id: 'salary', label: 'Schedule Salary' },
-  { id: 'house_property', label: 'Schedule HP' },
-  { id: 'other_sources', label: 'Schedule OS' },
-  { id: 'deductions', label: 'Deductions (VI-A)' },
-  { id: 'taxes', label: 'Tax Computation' },
+  { id: 'general',     label: 'General Information' },
+  { id: 'salary',      label: 'Salary & TDS' },
+  { id: 'deductions',  label: 'Deductions (VI-A)' },
+  { id: 'taxes',       label: 'Tax Computation' },
 ]
 
 const formData = reactive({
-  general: {
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    pan: '',
-    aadhaar: '',
-    dob: ''
-  },
-  salary: {
-    gross: 0,
-    perquisites: 0,
-    profits: 0,
-    hra: 0,
-    lta: 0
-  },
-  deductions: {
-    section80c: 0,
-    section80d: 0,
-    section80tta: 0
-  }
+  regime: 'new' as 'old' | 'new',
+  general: { firstName: '', middleName: '', lastName: '', pan: '', aadhaar: '', dob: '' },
+  salary: { gross: 0, tds: 0 },
+  deductions: { section80c: 0, section80d: 0 },
 })
 
-const calculateTotalIncome = () => {
-  const grossSalary = Number(formData.salary.gross) + Number(formData.salary.perquisites) + Number(formData.salary.profits)
-  const exemptions = Number(formData.salary.hra) + Number(formData.salary.lta)
-  const netSalary = grossSalary - exemptions
-  const deductions = Number(formData.deductions.section80c) + Number(formData.deductions.section80d) + Number(formData.deductions.section80tta)
-  return Math.max(0, netSalary - deductions)
+interface TaxBreakdown {
+  regime: string
+  fy: string
+  gross_income: number
+  taxable_income: number
+  slab_tax: number
+  rebate_87a: number
+  tax_after_rebate: number
+  surcharge: number
+  cess: number
+  total_tax: number
 }
 
-const calculateTax = () => {
-  // Simplified tax calc
-  const income = calculateTotalIncome()
-  if (income <= 250000) return 0
-  return (income - 250000) * 0.05 // Mock
+const preview = ref<TaxBreakdown | null>(null)
+const previewLoading = ref(false)
+const previewError = ref('')
+const submitting = ref(false)
+const submitError = ref('')
+
+const netDue = computed(() => {
+  if (!preview.value) return 0
+  return preview.value.total_tax - Number(formData.salary.tds || 0)
+})
+
+let debounceHandle: ReturnType<typeof setTimeout> | null = null
+const fetchPreview = async () => {
+  previewLoading.value = true
+  previewError.value = ''
+  try {
+    const resp = await fetch(`${API_BASE}/api/v2/calc/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gross_income: Number(formData.salary.gross || 0),
+        deductions: {
+          '80c': Number(formData.deductions.section80c || 0),
+          '80d': Number(formData.deductions.section80d || 0),
+        },
+        regime: formData.regime,
+        is_salary_income: true,
+      }),
+    })
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}))
+      throw new Error(body.detail || `HTTP ${resp.status}`)
+    }
+    preview.value = await resp.json()
+  } catch (e: any) {
+    preview.value = null
+    previewError.value = e.message || 'Failed to compute tax'
+  } finally {
+    previewLoading.value = false
+  }
 }
+
+const recomputeNow = () => {
+  if (debounceHandle) clearTimeout(debounceHandle)
+  fetchPreview()
+}
+
+watch(
+  () => [
+    formData.regime,
+    formData.salary.gross,
+    formData.salary.tds,
+    formData.deductions.section80c,
+    formData.deductions.section80d,
+  ],
+  () => {
+    if (debounceHandle) clearTimeout(debounceHandle)
+    debounceHandle = setTimeout(fetchPreview, 400)
+  },
+  { immediate: true },
+)
+
+const submitFiling = async () => {
+  if (!authStore.user?.id) {
+    submitError.value = 'Please log in first.'
+    return
+  }
+  if (!formData.salary.gross) {
+    submitError.value = 'Enter Gross Salary on the Salary & TDS tab.'
+    activeTab.value = 'salary'
+    return
+  }
+  submitting.value = true
+  submitError.value = ''
+  try {
+    const resp = await fetch(`${API_BASE}/api/v2/filing/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: authStore.user.id,
+        regime: formData.regime,
+        salary: { gross: Number(formData.salary.gross), tds: Number(formData.salary.tds || 0) },
+        deductions: {
+          '80c': Number(formData.deductions.section80c || 0),
+          '80d': Number(formData.deductions.section80d || 0),
+        },
+      }),
+    })
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}))
+      throw new Error(body.detail || `HTTP ${resp.status}`)
+    }
+    router.push('/filings')
+  } catch (e: any) {
+    submitError.value = e.message || 'Failed to submit'
+  } finally {
+    submitting.value = false
+  }
+}
+
+// Tiny render-helper component, used inline so we don't need a separate file.
+const Row = (props: { label: string; value?: number; raw?: string; negative?: boolean }) =>
+  h('div', { class: 'flex justify-between text-sm' }, [
+    h('span', { class: 'text-muted-foreground' }, props.label),
+    h('span', { class: 'font-mono' },
+      props.raw !== undefined
+        ? props.raw
+        : `${props.negative && (props.value || 0) > 0 ? '-' : ''}\u20B9${Number(props.value || 0).toLocaleString('en-IN')}`),
+  ])
 </script>
