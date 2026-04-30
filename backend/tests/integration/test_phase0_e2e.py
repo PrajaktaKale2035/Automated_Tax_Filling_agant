@@ -52,6 +52,69 @@ async def test_calculator_node_old_regime_with_80c():
     assert out["tax_breakdown"]["total_tax"] == 132_600
 
 
+@pytest.mark.asyncio
+async def test_auditor_node_passes_for_valid_breakdown():
+    from app.agents_v2.nodes import auditor_node
+
+    state = {
+        "tax_breakdown": {
+            "gross_income": 600_000,
+            "taxable_income": 525_000,
+            "slab_tax": 11_250,
+            "rebate_87a": 11_250,
+            "tax_after_rebate": 0,
+            "surcharge": 0,
+            "cess": 0,
+            "total_tax": 0,
+        },
+        "thread_id": "t-3",
+    }
+    out = await auditor_node(state)
+    assert out["audit_status"] == "passed"
+    assert out["audit_errors"] is None
+
+
+@pytest.mark.asyncio
+async def test_auditor_node_flags_inconsistent_total():
+    from app.agents_v2.nodes import auditor_node
+
+    state = {
+        "tax_breakdown": {
+            "gross_income": 600_000,
+            "taxable_income": 525_000,
+            "slab_tax": 11_250,
+            "rebate_87a": 0,
+            "tax_after_rebate": 11_250,
+            "surcharge": 0,
+            "cess": 450,
+            # Wrong: should be 11_700, not 99_999
+            "total_tax": 99_999,
+        },
+        "thread_id": "t-4",
+    }
+    out = await auditor_node(state)
+    assert out["audit_status"] == "failed"
+    assert any("total_tax" in e for e in out["audit_errors"])
+
+
+@pytest.mark.asyncio
+async def test_auditor_node_flags_taxable_exceeding_gross():
+    from app.agents_v2.nodes import auditor_node
+
+    state = {
+        "tax_breakdown": {
+            "gross_income": 100_000,
+            "taxable_income": 200_000,  # Impossible
+            "slab_tax": 0, "rebate_87a": 0, "tax_after_rebate": 0,
+            "surcharge": 0, "cess": 0, "total_tax": 0,
+        },
+        "thread_id": "t-5",
+    }
+    out = await auditor_node(state)
+    assert out["audit_status"] == "failed"
+    assert any("exceeds gross" in e for e in out["audit_errors"])
+
+
 def test_full_phase0_pipeline_via_api(db_session):
     """Full pipeline: POST /start -> DB row -> GET /pdf -> GET /json."""
     user = User(id=99, email="e2e@test.in", hashed_password="x", full_name="E2E User")

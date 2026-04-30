@@ -25,5 +25,5 @@ class Screen(BaseModel):
     layout: Literal["single-column", "two-column", "bento-grid", "dashboard-layout"]
     components: List[UIComponent]
 
-# Recursive self-reference for children
-UIComponent.update_forward_refs()
+# Recursive self-reference for children (Pydantic v2 API).
+UIComponent.model_rebuild()

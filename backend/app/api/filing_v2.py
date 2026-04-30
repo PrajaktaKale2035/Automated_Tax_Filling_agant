@@ -233,7 +233,7 @@ def get_filing_json(filing_id: int, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Filing Status (kept from prior version for backwards compat)
+# Filing Status
 # ---------------------------------------------------------------------------
 
 @router.get("/filing/{filing_id}/status")
@@ -250,3 +250,91 @@ def get_filing_status(filing_id: int, db: Session = Depends(get_db)):
         "tax_due": int(filing.tax_due),
         "refund_due": int(filing.refund_due),
     }
+
+
+# ---------------------------------------------------------------------------
+# Conversational filing flow (LangGraph)
+#   Drives the interviewer -> researcher -> calculator -> auditor workflow.
+#   Useful when the user prefers a chat-style flow over the structured POST.
+# ---------------------------------------------------------------------------
+
+class ChatStartRequest(BaseModel):
+    user_id: int
+    initial_message: str = "I want to file my ITR-1 for AY 2025-26"
+
+
+class ChatMessageRequest(BaseModel):
+    thread_id: str
+    message: str
+
+
+def _serialize_messages(messages: List[Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for m in messages or []:
+        # LangChain messages have .type / .content; raw dicts pass through.
+        if hasattr(m, "type") and hasattr(m, "content"):
+            out.append({"role": m.type, "content": m.content})
+        elif isinstance(m, dict):
+            out.append(m)
+    return out
+
+
+def _serialize_result(thread_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "thread_id": thread_id,
+        "messages": _serialize_messages(result.get("messages", [])),
+        "user_profile": result.get("user_profile"),
+        "regime": result.get("regime"),
+        "research_results": result.get("research_results"),
+        "tax_breakdown": result.get("tax_breakdown") or result.get("calculation_result"),
+        "audit_status": result.get("audit_status"),
+        "audit_errors": result.get("audit_errors"),
+        "current_agent": result.get("current_agent"),
+    }
+
+
+@router.post("/filing/chat/start")
+async def chat_start(req: ChatStartRequest):
+    """Start a chat-driven filing session via LangGraph."""
+    from langchain_core.messages import HumanMessage
+    from app.agents_v2.graph import tax_filing_graph
+    import uuid as _uuid
+
+    thread_id = f"tax-{req.user_id}-{_uuid.uuid4().hex[:8]}"
+    config = {"configurable": {"thread_id": thread_id}}
+    initial_state = {
+        "messages": [HumanMessage(content=req.initial_message)],
+        "thread_id": thread_id,
+        "user_profile": {},
+        "tax_draft": {},
+    }
+    try:
+        result = await tax_filing_graph.ainvoke(initial_state, config=config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"graph execution failed: {e}")
+    return _serialize_result(thread_id, result)
+
+
+@router.post("/filing/chat/message")
+async def chat_message(req: ChatMessageRequest):
+    """Continue a chat-driven filing session."""
+    from langchain_core.messages import HumanMessage
+    from app.agents_v2.graph import tax_filing_graph
+
+    config = {"configurable": {"thread_id": req.thread_id}}
+    try:
+        snapshot = await tax_filing_graph.aget_state(config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"failed to load thread: {e}")
+    if not snapshot or not snapshot.values:
+        raise HTTPException(status_code=404, detail=f"thread {req.thread_id} not found")
+
+    updated = {
+        **snapshot.values,
+        "messages": list(snapshot.values.get("messages", [])) + [HumanMessage(content=req.message)],
+    }
+    try:
+        result = await tax_filing_graph.ainvoke(updated, config=config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"graph execution failed: {e}")
+    return _serialize_result(req.thread_id, result)

@@ -30,6 +30,7 @@ app = FastAPI(
     version="1.0.0-phase0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
 
@@ -111,11 +112,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def root():
     """Root endpoint - API information."""
     return {
-        "name": "Tax Filing System API",
-        "version": "1.0.0",
+        "name": app.title,
+        "version": app.version,
         "status": "running",
         "docs": "/api/docs",
-        "health": "/api/health"
+        "health": "/api/health",
     }
 
 
