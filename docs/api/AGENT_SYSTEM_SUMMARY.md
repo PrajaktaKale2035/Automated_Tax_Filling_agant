@@ -1,6 +1,21 @@
 # AI Agent Tax Filing System - Implementation Summary
 
-## Project Overview
+> **Historical document.** This summary describes the original US-tax-filing
+> agent system as implemented on the frontend (TypeScript / LangChain.js / Pinia).
+> The backend agent system has since been migrated to **LangGraph only** with
+> Indian ITR-1 semantics. For the current backend agent architecture see:
+>
+> - [`backend/app/agents_v2/graph.py`](../../backend/app/agents_v2/graph.py) — StateGraph wiring
+> - [`backend/app/agents_v2/nodes.py`](../../backend/app/agents_v2/nodes.py) — interviewer / researcher / calculator / auditor
+> - [`MIGRATION_NOTES.md`](../MIGRATION_NOTES.md) — what changed
+>
+> The frontend agent store described below still exists, but the tax tools call
+> the backend `/api/v2/calc/preview` endpoint instead of running US tax math
+> locally. See [`API_REFERENCE.md`](API_REFERENCE.md) for the REST API.
+
+---
+
+## Project Overview (historical, frontend-focused)
 
 This project implements a **fully functional AI agent-based adaptive intelligent tax filing system** with multi-agent architecture, tool-based execution, LLM integration, and explainable AI capabilities.
 

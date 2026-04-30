@@ -1,8 +1,61 @@
 # Backend Development Status
 
-## ✅ COMPLETED: Task 1 - FastAPI Backend Core
+> **Updated 2026-05-01.** This document originally tracked the US-tax-filing
+> prototype phase work. The historical sections below are kept for context, but
+> the canonical current status is the section directly below. For the full
+> migration changelog see [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md).
 
-**Date Completed:** December 2024  
+---
+
+## Current Status — Phase 0-4 complete (Indian ITR-1)
+
+**Date:** 2026-05-01
+**Branch:** `develop`
+**Status:** 🟢 End-to-end Indian ITR-1 pipeline operational. 75/75 tests pass, 0 warnings.
+
+### What works end-to-end
+- Deterministic Indian tax engine (`backend/app/services/tax_engine_in.py`)
+- Indian ITR-1 schema in Postgres — 7 tables (see `app/models.py`)
+- **pgvector** RAG over the curated FY 2024-25 rulebook (replaces ChromaDB)
+- LangGraph workflow: interviewer -> researcher -> calculator -> auditor (AutoGen retired)
+- Form 16 OCR upload + structured extraction -> `form16` table
+- ITR-1 JSON in IT Dept schema + ITR-1 PDF (INR Indian grouping)
+- WebSocket `filing.starting / .calculating / .complete` events keyed to `client_id`
+- 19 REST routes, all India-aligned
+
+### Endpoints
+- `POST /api/v2/calc/preview` — stateless tax computation
+- `POST /api/v2/filing/start` — manual entry or `form16_id`
+- `GET /api/v2/filing/{id}/{pdf,json,status}`
+- `POST /api/v2/filing/chat/{start,message}` — LangGraph chat workflow
+- `WS /api/ws/{client_id}` — realtime filing events
+
+### Stack changes vs. the historical sections below
+- Postgres image: `postgres:18` -> `pgvector/pgvector:pg16`
+- Vector store: ChromaDB -> pgvector (`Vector(384)` column on `rag_documents`)
+- Multi-agent: LangGraph + AutoGen (parallel) -> LangGraph only
+- Tax math: 3 places (LangGraph + frontend + PDF) -> single `tax_engine_in`
+- Tables: dropped W2Form / Form1099 / Dependent / TaxForm / UserInputData; added Form16, ITR1Filing, RagDocument; added pan_encrypted / aadhaar_encrypted on User
+- LangGraph checkpointer: `InMemorySaver` (Phase 0); `AsyncPostgresSaver` deferred to Phase 3+
+
+### Known gaps (intentional, deferred)
+- Real IT Dept PDF ingestion (currently uses curated `tax_rules.txt`)
+- E-filing submission to incometax.gov.in
+- Frontend tool modules outside the data pipeline (`complianceTools.ts`, `advisoryTools.ts`) still contain US thresholds — not on the `tax_engine_in` path
+
+---
+
+## Historical sections — US prototype (preserved for context)
+
+> Everything below describes the original US-tax-filing scaffolding. It is no
+> longer accurate for the running system but is kept so older PRs, commits, and
+> tickets remain readable.
+
+---
+
+## ✅ COMPLETED: Task 1 - FastAPI Backend Core (historical, US scaffolding)
+
+**Date Completed:** December 2024
 **Status:** 🟢 FULLY OPERATIONAL
 
 ---

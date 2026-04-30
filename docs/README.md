@@ -1,16 +1,23 @@
-# 📚 Tax Filing AI Agent - Documentation Index
+# Indian Tax Filing AI Agent - Documentation Index
 
-Welcome to the Tax Filing AI Agent documentation! This guide will help you navigate through all available documentation.
+Welcome to the documentation for the **Indian Tax Filing AI Agent** (ITR-1 / FY 2024-25). This index links to setup guides, REST API references, design specs, and the migration changelog.
+
+> **First time here?** Read [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md) — it explains the US-to-India migration so historical references to W-2/1099/ChromaDB/AutoGen make sense.
 
 ---
 
-## 📂 Documentation Structure
+## Documentation Structure
 
 ```
 docs/
-├── setup/          # Installation and setup guides
-├── guides/         # Feature guides and tutorials
-└── api/            # API reference and technical docs
+├── MIGRATION_NOTES.md      # US -> India changelog (READ FIRST if you're catching up)
+├── PROJECT_STRUCTURE.md    # File and table layout after the migration
+├── BACKEND_STATUS.md       # Phase status snapshot
+├── IMPLEMENTATION_PLAN.md  # Historical implementation plan
+├── setup/                  # Postgres + pgvector + schema setup
+├── guides/                 # LangChain / providers
+├── api/                    # REST API reference + frontend agent store API
+└── superpowers/            # Design specs, broken-pipelines audit, Phase 0 plan
 ```
 
 ---
@@ -196,9 +203,9 @@ Found a typo? Want to improve a guide? Contributions welcome!
 - [ ] Troubleshooting FAQ
 
 ### In Progress
-- [ ] Complete API reference
-- [ ] AutoGen integration guide
-- [ ] Vector database setup
+- [ ] Real IT Department PDF ingestion guide (currently uses curated `tax_rules.txt`)
+- [ ] AsyncPostgresSaver checkpointing guide (currently `InMemorySaver`)
+- [ ] E-filing submission integration with incometax.gov.in
 
 ---
 

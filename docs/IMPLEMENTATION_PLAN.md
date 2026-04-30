@@ -1,6 +1,15 @@
-# 🎯 Automated Tax Filing System - Implementation Plan
+# Automated Tax Filing System - Implementation Plan
 
-## 📋 Project Vision
+> **Historical document.** This plan was written for the original US-tax-filing
+> prototype. The project has since been migrated to Indian ITR-1 filing
+> (FY 2024-25 / AY 2025-26). For current implementation status see
+> [`BACKEND_STATUS.md`](BACKEND_STATUS.md). For the migration changelog see
+> [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md). For the post-migration plan see
+> [`superpowers/plans/2026-04-30-indian-tax-data-pipeline-phase0.md`](superpowers/plans/2026-04-30-indian-tax-data-pipeline-phase0.md).
+
+---
+
+## Project Vision (historical)
 
 Build a fully automated tax filing system with **3 intelligent modes** that adapts question flows based on user expertise, automatically processes documents, calculates taxes, validates compliance, and generates ready-to-file forms.
 
