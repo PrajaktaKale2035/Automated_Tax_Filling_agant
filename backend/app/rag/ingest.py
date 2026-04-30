@@ -1,56 +1,147 @@
+"""Ingest Indian tax rulebook content into the pgvector-backed `rag_documents` table.
+
+Phase 1: ingests the curated `tax_rules.txt` (FY 2024-25 / AY 2025-26).
+Future runs should add real IT Dept PDFs (Income Tax Act 1961 chapters,
+ITR-1 instructions, Finance Act 2024, CBDT circulars on 80C/80D).
+
+Embedding model: SentenceTransformer all-MiniLM-L6-v2 (384 dim).
+Storage: pgvector cosine similarity on `rag_documents.embedding`.
+"""
+from __future__ import annotations
+
 import os
-import chromadb
-from chromadb.utils import embedding_functions
+import re
+from pathlib import Path
+from typing import Optional
 
-# Settings
-PERSIST_DIRECTORY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "chroma_db")
-COLLECTION_NAME = "tax_rules"
-DATA_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "tax_rules.txt")
+from sentence_transformers import SentenceTransformer
 
-def ingest_data():
-    print(f"Ingesting data from {DATA_FILE} into {PERSIST_DIRECTORY}")
-    
-    # Initialize Client
-    client = chromadb.PersistentClient(path=PERSIST_DIRECTORY, settings=chromadb.Settings(anonymized_telemetry=False))
-    
-    # Embedding Function
-    # Using sentence-transformers model
-    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-    
-    # Get or Create Collection
-    # Delete if exists to start fresh
+from app.database import SessionLocal
+from app.models import RagDocument
+
+
+_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+_DEFAULT_DATA_FILE = Path(__file__).resolve().parents[2] / "tax_rules.txt"
+_DEFAULT_COLLECTION = "itr_rulebook"
+
+_TOPIC_KEYWORDS = {
+    "slab":               "slabs",
+    "regime":             "slabs",
+    "80c":                "80C",
+    "80d":                "80D",
+    "rebate":             "rebate-87a",
+    "87a":                "rebate-87a",
+    "surcharge":          "surcharge",
+    "cess":               "cess",
+    "tds":                "tds",
+    "standard deduction": "standard-deduction",
+    "form 16":            "form-16",
+    "pan":                "identity",
+    "aadhaar":            "identity",
+}
+
+
+def _infer_topic(text: str) -> Optional[str]:
+    lowered = text.lower()
+    for needle, topic in _TOPIC_KEYWORDS.items():
+        if needle in lowered:
+            return topic
+    return None
+
+
+def _chunk_paragraphs(text: str) -> list[str]:
+    """Split by blank lines, keeping semantic paragraph boundaries."""
+    chunks = re.split(r"\n\s*\n", text)
+    return [c.strip() for c in chunks if c.strip()]
+
+
+def ingest_text(
+    raw_text: str,
+    *,
+    source: str,
+    collection: str = _DEFAULT_COLLECTION,
+    model_name: str = _MODEL_NAME,
+    replace_collection: bool = True,
+) -> int:
+    """Embed `raw_text` (split into paragraphs) and write rows to `rag_documents`.
+
+    Returns the number of rows written.
+    """
+    chunks = _chunk_paragraphs(raw_text)
+    if not chunks:
+        return 0
+
+    model = SentenceTransformer(model_name)
+    embeddings = model.encode(chunks, show_progress_bar=False, normalize_embeddings=True)
+
+    db = SessionLocal()
     try:
-        client.delete_collection(name=COLLECTION_NAME)
-    except ValueError:
-        pass
-        
-    collection = client.create_collection(name=COLLECTION_NAME, embedding_function=sentence_transformer_ef)
-    
-    # Read Data
-    if not os.path.exists(DATA_FILE):
-        print(f"File {DATA_FILE} not found.")
-        return
+        if replace_collection:
+            db.query(RagDocument).filter(RagDocument.collection == collection).delete()
+            db.commit()
 
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        text = f.read()
-    
-    # Simple splitting by paragraphs
-    documents = [chunk.strip() for chunk in text.split("\n\n") if chunk.strip()]
-    ids = [f"rule_{i}" for i in range(len(documents))]
-    metadatas = [{"source": "tax_rules.txt"} for _ in documents]
-    
-    if not documents:
-        print("No documents found to ingest.")
-        return
+        for idx, (chunk, vec) in enumerate(zip(chunks, embeddings)):
+            db.add(RagDocument(
+                collection=collection,
+                source=source,
+                chunk_index=idx,
+                topic=_infer_topic(chunk),
+                content=chunk,
+                embedding=vec.tolist(),
+                extra_metadata={"model": model_name, "char_len": len(chunk)},
+            ))
+        db.commit()
+        return len(chunks)
+    finally:
+        db.close()
 
-    # Add to collection
-    collection.add(
-        documents=documents,
-        ids=ids,
-        metadatas=metadatas
+
+def ingest_file(
+    path: os.PathLike | str = _DEFAULT_DATA_FILE,
+    *,
+    collection: str = _DEFAULT_COLLECTION,
+    model_name: str = _MODEL_NAME,
+    replace_collection: bool = True,
+) -> int:
+    """Ingest a single text file."""
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"data file not found: {path}")
+    text = path.read_text(encoding="utf-8")
+    return ingest_text(
+        text,
+        source=path.name,
+        collection=collection,
+        model_name=model_name,
+        replace_collection=replace_collection,
     )
-    
-    print(f"Successfully ingested {len(documents)} documents into {COLLECTION_NAME}")
+
+
+def ingest_directory(
+    directory: os.PathLike | str,
+    *,
+    collection: str = _DEFAULT_COLLECTION,
+    model_name: str = _MODEL_NAME,
+    replace_collection: bool = True,
+    pattern: str = "*.txt",
+) -> int:
+    """Ingest every file matching `pattern`. Clears collection only before the first file."""
+    directory = Path(directory)
+    files = sorted(directory.glob(pattern))
+    if not files:
+        return 0
+    total = 0
+    for i, path in enumerate(files):
+        total += ingest_text(
+            path.read_text(encoding="utf-8"),
+            source=path.name,
+            collection=collection,
+            model_name=model_name,
+            replace_collection=(replace_collection and i == 0),
+        )
+    return total
+
 
 if __name__ == "__main__":
-    ingest_data()
+    n = ingest_file()
+    print(f"Ingested {n} chunks from {_DEFAULT_DATA_FILE.name} into '{_DEFAULT_COLLECTION}'.")

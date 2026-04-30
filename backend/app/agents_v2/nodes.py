@@ -79,53 +79,51 @@ async def interviewer_node(state: TaxFilingState) -> Dict[str, Any]:
 # ============================================================================
 
 async def researcher_node(state: TaxFilingState) -> Dict[str, Any]:
+    """Real RAG over the IT Department rulebook (pgvector + SentenceTransformer).
+
+    Phase 1: queries the `rag_documents` table for chunks relevant to the
+    user's profile. Pulls per-topic context (slabs, 80C, 80D, surcharge, cess)
+    so the calculator and auditor can ground their explanations in the rulebook.
     """
-    Queries Neo4j Knowledge Graph for applicable tax codes.
-    
-    Role: The legal scholar that retrieves relevant statutes
-    Tech: LlamaIndex PropertyGraphIndex with Neo4j backend
-    
-    Args:
-        state: Current graph state with user_profile
-    
-    Returns:
-        Updated state with research_results from knowledge graph
-    """
-    # Placeholder - will be implemented once Neo4j is running
-    user_profile = state.get("user_profile", {})
-    age = user_profile.get("age", 30)
-    
-    # Simulate graph query results
+    from app.rag.retriever import TaxRetriever
+
+    profile = state.get("user_profile") or {}
+    regime = state.get("regime") or profile.get("regime") or "new"
+    income = int(profile.get("income_salary", 0) or 0)
+    age = int(profile.get("age", 30) or 30)
+
+    # Compose a query from the user context.
+    query = (
+        f"Indian income tax rules for salary income {income} INR, "
+        f"{regime} regime, age {age}. Slabs, deductions 80C, 80D, "
+        f"rebate 87A, surcharge, and cess."
+    )
+
+    retriever = TaxRetriever()
+    chunks = retriever.retrieve(query, k=6)
+
     research_results = [
         {
-            "section": "80C",
-            "description": "Deduction up to ₹1.5L for investments in PPF, ELSS, etc.",
-            "applicable": True,
-            "conditions": ["Available in Old Regime only"]
-        },
-        {
-            "section": "80D",
-            "description": "Health insurance premium deduction",
-            "applicable": True,
-            "conditions": [f"Senior citizen (age >= 60): {age >= 60}"]
+            "section": c.topic or "general",
+            "description": c.content,
+            "source": c.source,
+            "score": c.score,
         }
+        for c in chunks
     ]
-    
-    # TODO: Replace with actual Neo4j query via LlamaIndex
-    # from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
-    # graph_store = Neo4jPropertyGraphStore(...)
-    # query_engine = index.as_query_engine()
-    # results = query_engine.query(f"Find deductions for age {age}")
-    
-    await manager.broadcast({
-        "type": "agent_activity",
-        "agent": "Researcher",
-        "message": f"Found {len(research_results)} applicable tax sections."
-    })
+
+    try:
+        await manager.broadcast({
+            "type": "agent_activity",
+            "agent": "Researcher",
+            "message": f"Retrieved {len(research_results)} rulebook chunks for {regime} regime.",
+        })
+    except Exception:
+        pass
 
     return {
         "research_results": research_results,
-        "current_agent": "researcher"
+        "current_agent": "researcher",
     }
 
 

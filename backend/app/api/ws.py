@@ -1,11 +1,12 @@
-"""WebSocket router.
+"""WebSocket router for filing progress + completion events.
 
-Phase 0: AutoGen retired. This is an echo stub.
-Phase 3 will wire LangGraph state events (filing.researching, filing.calculating,
-filing.complete) into this channel.
+Phase 3: clients connect with `/api/ws/{client_id}`. The backend pushes
+filing.* events keyed to that client_id when filings are computed.
 """
 import json
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from app.websockets.manager import manager
 
 router = APIRouter(tags=["WebSockets"])
@@ -13,10 +14,10 @@ router = APIRouter(tags=["WebSockets"])
 
 @router.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await manager.connect(websocket)
+    await manager.connect(websocket, client_id)
     await websocket.send_json({
-        "sender": "system",
         "event": "connected",
+        "client_id": client_id,
         "message": "Connected to Indian Tax Filing Assistant",
     })
     try:
@@ -28,11 +29,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             except json.JSONDecodeError:
                 user_message = data
 
-            # Phase 0: echo back. Phase 3 will route to LangGraph events.
+            # Phase 3 leaves the inbound channel as a passthrough echo for
+            # heartbeats / debugging. Real filing progress is pushed by
+            # backend handlers via manager.send_to_client().
             await websocket.send_json({
-                "sender": "assistant",
                 "event": "echo",
-                "message": f"Phase 0 stub: received '{user_message}'",
+                "message": user_message,
             })
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, client_id)

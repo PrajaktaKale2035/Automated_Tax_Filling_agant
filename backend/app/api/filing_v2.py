@@ -16,10 +16,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ITR1Filing, User
+from app.models import ITR1Filing, User, Form16
 from app.services.tax_engine_in import compute_filing
 from app.services.itr1_json_builder import build_itr1_json
 from app.services.pdf_generator import generate_itr1_pdf
+from app.websockets.manager import manager
 
 router = APIRouter(prefix="/api/v2", tags=["Indian Tax Filing v2"])
 
@@ -58,11 +59,18 @@ def calc_preview(req: CalcPreviewRequest):
 # ---------------------------------------------------------------------------
 
 class FilingStartRequest(BaseModel):
+    """Either provide `form16_id` (Phase 2 path) OR `salary` (manual entry).
+
+    If `form16_id` is supplied, salary and deductions are loaded from the Form16 row.
+    `client_id` (optional) routes filing.* progress events back over WebSocket.
+    """
     user_id: int
     assessment_year: str = "2025-26"
     regime: Literal["old", "new"]
-    salary: Dict[str, float]            # {"gross": ..., "tds": ...}
-    deductions: Dict[str, float] = {}   # {"80c": ..., "80d": ...}
+    form16_id: Optional[int] = None
+    salary: Optional[Dict[str, float]] = None     # {"gross": ..., "tds": ...}
+    deductions: Optional[Dict[str, float]] = None  # {"80c": ..., "80d": ...}
+    client_id: Optional[str] = None                # for WS event routing
 
 
 class FilingStartResponse(BaseModel):
@@ -74,40 +82,78 @@ class FilingStartResponse(BaseModel):
     refund_due: int
 
 
+async def _emit(client_id: Optional[str], event: str, **payload) -> None:
+    """Push a filing.* event to the user's WebSocket channel (best-effort)."""
+    if not client_id:
+        return
+    try:
+        await manager.send_to_client(client_id, {"event": event, **payload})
+    except Exception:
+        pass
+
+
 @router.post("/filing/start", response_model=FilingStartResponse)
-def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
-    """Manual-entry filing path. Computes a filing, persists it, and writes the PDF."""
-    # Verify user exists.
+async def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
+    """Compute a filing from either a Form 16 row or a manual JSON payload."""
+    await _emit(req.client_id, "filing.starting", user_id=req.user_id, regime=req.regime)
+
     user = db.query(User).filter_by(id=req.user_id).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=f"user {req.user_id} not found")
 
+    # Source the inputs - Form 16 takes precedence over manual entry.
+    form16: Optional[Form16] = None
+    if req.form16_id is not None:
+        form16 = db.query(Form16).filter_by(id=req.form16_id, user_id=req.user_id).one_or_none()
+        if not form16:
+            raise HTTPException(status_code=404, detail=f"form16 {req.form16_id} not found for user {req.user_id}")
+        salary = {
+            "gross": float(form16.gross_salary or 0),
+            "tds": float(form16.tds_deducted or 0),
+        }
+        deductions = {
+            "80c": float(form16.deductions_80c or 0),
+            "80d": float(form16.deductions_80d or 0),
+        }
+        assessment_year = form16.assessment_year or req.assessment_year
+    else:
+        if not req.salary:
+            raise HTTPException(
+                status_code=422,
+                detail="Either form16_id or salary must be provided",
+            )
+        salary = dict(req.salary)
+        deductions = dict(req.deductions or {})
+        assessment_year = req.assessment_year
+
+    await _emit(req.client_id, "filing.calculating")
     breakdown = compute_filing(
-        gross_income=int(req.salary.get("gross", 0)),
-        deductions=req.deductions,
+        gross_income=int(salary.get("gross", 0)),
+        deductions=deductions,
         regime=req.regime,
         is_salary_income=True,
     )
 
     user_block = {
-        "pan": "",  # Phase 2 will pull from User.pan_encrypted (decrypted)
+        "pan": (form16.employer_pan if form16 else "") or "",
         "aadhaar": None,
         "name": user.full_name or "",
     }
 
     itr_json = build_itr1_json({
         "user": user_block,
-        "assessment_year": req.assessment_year,
+        "assessment_year": assessment_year,
         "regime": req.regime,
-        "salary": req.salary,
-        "deductions": req.deductions,
+        "salary": salary,
+        "deductions": deductions,
         "tax_breakdown": breakdown.to_dict(),
     })
 
-    tds_paid = int(req.salary.get("tds", 0))
+    tds_paid = int(salary.get("tds", 0))
     filing = ITR1Filing(
         user_id=req.user_id,
-        assessment_year=req.assessment_year,
+        form16_id=form16.id if form16 else None,
+        assessment_year=assessment_year,
         regime=req.regime,
         gross_income=breakdown.gross_income,
         taxable_income=breakdown.taxable_income,
@@ -129,16 +175,28 @@ def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
     # Render & cache the PDF.
     pdf = generate_itr1_pdf({
         "user": user_block,
-        "assessment_year": req.assessment_year,
+        "assessment_year": assessment_year,
         "regime": req.regime,
-        "salary": req.salary,
-        "deductions": req.deductions,
+        "salary": salary,
+        "deductions": deductions,
         "tax_breakdown": breakdown.to_dict(),
     })
     pdf_path = PDF_OUTPUT_DIR / f"{filing.id}.pdf"
     pdf_path.write_bytes(pdf.getvalue())
     filing.pdf_path = str(pdf_path)
     db.commit()
+
+    await _emit(
+        req.client_id,
+        "filing.complete",
+        filing_id=filing.id,
+        regime=filing.regime,
+        total_tax=int(filing.total_tax),
+        tax_due=int(filing.tax_due),
+        refund_due=int(filing.refund_due),
+        pdf_url=f"/api/v2/filing/{filing.id}/pdf",
+        json_url=f"/api/v2/filing/{filing.id}/json",
+    )
 
     return FilingStartResponse(
         filing_id=filing.id,

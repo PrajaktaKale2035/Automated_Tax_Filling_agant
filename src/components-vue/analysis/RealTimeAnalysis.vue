@@ -241,17 +241,17 @@ const aiInsights = ref([
   {
     icon: Target,
     title: 'Strategic Deductions',
-    description: 'Standard deduction recommended over itemizing'
+    description: 'Maximize Section 80C investments before financial year end'
   },
   {
     icon: Zap,
     title: 'Quick Wins',
-    description: '3 immediate actions could save you $2,600'
+    description: '3 immediate actions could save you \u20B92,60,000'
   }
 ]);
 
 const formatNumber = (num: number) => {
-  return num.toLocaleString('en-US');
+  return num.toLocaleString('en-IN');
 };
 
 // Real-time updates

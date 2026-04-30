@@ -2,11 +2,17 @@
 
 Phase 0: replaces US-shaped tables (W2Form, Form1099, Dependent, TaxForm) with
 Indian-shaped tables (Form16, ITR1Filing) and adds PAN/Aadhaar to User.
+Phase 1: adds RagDocument with pgvector embedding column for IT Dept rulebook RAG.
 """
 from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, Text, JSON, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 from app.database import Base
+
+
+# Embedding dimension for SentenceTransformer all-MiniLM-L6-v2 (used by Phase 1 RAG).
+RAG_EMBEDDING_DIM = 384
 
 
 class User(Base):
@@ -174,6 +180,32 @@ class ComplianceCheck(Base):
 
     def __repr__(self):
         return f"<ComplianceCheck(id={self.id}, type={self.check_type}, status={self.status})>"
+
+
+class RagDocument(Base):
+    """Embedded chunks of the ITR rulebook for retrieval-augmented generation.
+
+    Phase 1 ingests `tax_rules.txt` (curated Indian content) into this table.
+    Future ingestion runs may add Income Tax Act sections, ITR-1 instructions,
+    Finance Act 2024, CBDT circulars, etc.
+
+    Embedding model: SentenceTransformer all-MiniLM-L6-v2 (384 dim).
+    Distance metric: cosine.
+    """
+    __tablename__ = "rag_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    collection = Column(String, nullable=False, default="itr_rulebook", index=True)
+    source = Column(String, nullable=False)  # e.g., "tax_rules.txt", "ITR-1-instructions-AY2025-26.pdf"
+    chunk_index = Column(Integer, nullable=False, default=0)
+    topic = Column(String, index=True)  # e.g., "80C", "slabs", "surcharge" - optional metadata
+    content = Column(Text, nullable=False)
+    embedding = Column(Vector(RAG_EMBEDDING_DIM), nullable=False)
+    extra_metadata = Column(JSON, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<RagDocument(id={self.id}, source={self.source}, chunk={self.chunk_index})>"
 
 
 class AuditLog(Base):
