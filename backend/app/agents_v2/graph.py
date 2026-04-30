@@ -5,7 +5,7 @@ This is the "brain" of the Phase 1 architecture.
 It orchestrates the 4 agent nodes in a cyclic, stateful manner.
 """
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import InMemorySaver
 from .state import TaxFilingState
 from .nodes import interviewer_node, researcher_node, calculator_node, auditor_node
 import os
@@ -105,19 +105,10 @@ def create_tax_filing_graph():
         }
     )
     
-    # Set up PostgreSQL checkpointing for persistence
-    db_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql://taxuser:taxpass123@localhost:5433/taxdb"
-    )
-    
-    try:
-        checkpointer = PostgresSaver.from_conn_string(db_url)
-        print(f"✅ LangGraph checkpointing enabled with PostgreSQL")
-    except Exception as e:
-        print(f"⚠️  PostgreSQL checkpointing unavailable: {e}")
-        print("   Running without persistence (in-memory only)")
-        checkpointer = None
+    # Phase 0: in-memory checkpointing.
+    # Phase 3 will switch to AsyncPostgresSaver with `async with` lifecycle
+    # (the PostgresSaver context-manager API doesn't fit module-level wiring).
+    checkpointer = InMemorySaver()
     
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

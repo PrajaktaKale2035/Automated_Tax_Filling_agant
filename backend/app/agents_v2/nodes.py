@@ -134,63 +134,44 @@ async def researcher_node(state: TaxFilingState) -> Dict[str, Any]:
 # ============================================================================
 
 async def calculator_node(state: TaxFilingState) -> Dict[str, Any]:
+    """Deterministic Indian tax computation. NO LLM math.
+
+    Phase 0: calls services.tax_engine_in.compute_filing() with full
+    old/new regime support, 80C/80D deductions (old regime), rebate 87A,
+    surcharge bands, and 4% cess.
     """
-    Executes deterministic tax calculations using Rust engine.
-    
-    Role: The number cruncher with guaranteed precision
-    Tech: Rust via PyO3 (NOT an LLM - no hallucination risk)
-    
-    Args:
-        state: Current graph state with user_profile and research_results
-    
-    Returns:
-        Updated state with calculation_result
-    """
-    user_profile = state.get("user_profile", {})
-    
-    # Placeholder - will call Rust engine once built
-    # import tax_engine_rs
-    # result = tax_engine_rs.calculate_tax(
-    #     income=user_profile.get("income_salary", 0),
-    #     age=user_profile.get("age", 30)
-    # )
-    
-    # Simulate Rust calculation
-    income = user_profile.get("income_salary", 0)
-    deductions = user_profile.get("deductions_80c", 0)
-    taxable_income = income - deductions
-    
-    # Simplified Indian tax slab (AY 2025-26)
-    if taxable_income <= 300000:
-        tax = 0
-    elif taxable_income <= 700000:
-        tax = (taxable_income - 300000) * 0.05
-    elif taxable_income <= 1000000:
-        tax = 20000 + (taxable_income - 700000) * 0.10
-    elif taxable_income <= 1200000:
-        tax = 50000 + (taxable_income - 1000000) * 0.15
-    elif taxable_income <= 1500000:
-        tax = 80000 + (taxable_income - 1200000) * 0.20
-    else:
-        tax = 140000 + (taxable_income - 1500000) * 0.30
-    
-    calculation_result = {
-        "gross_income": income,
-        "deductions": deductions,
-        "taxable_income": taxable_income,
-        "tax_liability": tax,
-        "effective_tax_rate": (tax / income * 100) if income > 0 else 0
-    }
-    
-    await manager.broadcast({
-        "type": "agent_activity",
-        "agent": "Calculator",
-        "message": f"Calculated tax liability: ₹{tax}"
-    })
+    from app.services.tax_engine_in import compute_filing
+
+    profile = state.get("user_profile") or {}
+    regime = state.get("regime") or profile.get("regime") or "new"
+
+    breakdown = compute_filing(
+        gross_income=int(profile.get("income_salary", 0) or 0),
+        deductions={
+            "80c": int(profile.get("deductions_80c", 0) or 0),
+            "80d": int(profile.get("deductions_80d", 0) or 0),
+        },
+        regime=regime,
+        is_salary_income=True,
+    )
+
+    breakdown_dict = breakdown.to_dict()
+
+    try:
+        await manager.broadcast({
+            "type": "agent_activity",
+            "agent": "Calculator",
+            "message": f"Computed total tax: Rs {breakdown.total_tax} ({regime} regime)",
+        })
+    except Exception:
+        # WebSocket broadcast is best-effort; never block calc on it.
+        pass
 
     return {
-        "calculation_result": calculation_result,
-        "current_agent": "calculator"
+        "tax_breakdown": breakdown_dict,
+        "calculation_result": breakdown_dict,
+        "regime": regime,
+        "current_agent": "calculator",
     }
 
 

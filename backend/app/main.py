@@ -1,24 +1,36 @@
-"""FastAPI main application."""
+"""FastAPI main application for the Indian Tax Filing System."""
+import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
-import time
 
 from app.database import engine, Base
-from app.api import auth, users, tax_forms, sdui, ws, documents, filing
+from app.api import auth, users, sdui, ws, documents, filing_v2
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
-# Initialize FastAPI app
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    Base.metadata.create_all(bind=engine)
+    print("Tax Filing System API starting up (Indian ITR-1 / FY2024-25)...")
+    print("API documentation available at: http://localhost:8000/api/docs")
+    print("Health check available at: http://localhost:8000/api/health")
+    yield
+    # Shutdown
+    print("Tax Filing System API shutting down...")
+
+
 app = FastAPI(
-    title="Tax Filing System API",
-    description="Automated tax filing system with mode-based question flows",
-    version="1.0.0",
+    title="Indian Tax Filing System API",
+    description="ITR-1 (Sahaj) filing system with deterministic tax engine and LangGraph agents",
+    version="1.0.0-phase0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    lifespan=lifespan,
 )
 
 # ============================================================================
@@ -27,11 +39,10 @@ app = FastAPI(
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-app.include_router(tax_forms.router, prefix="/api")
 app.include_router(sdui.router)
 app.include_router(ws.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
-app.include_router(filing.router, prefix="/api")
+app.include_router(filing_v2.router)  # Indian tax filing pipeline (LangGraph + tax_engine_in)
 
 # ============================================================================
 # CORS Middleware
@@ -66,7 +77,7 @@ async def add_process_time_header(request: Request, call_next):
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle validation errors with detailed messages."""
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "detail": exc.errors(),
             "message": "Validation error - please check your input"
@@ -136,24 +147,6 @@ async def health_check():
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
-
-
-# ============================================================================
-# Startup and Shutdown Events
-# ============================================================================
-
-@app.on_event("startup")
-async def startup_event():
-    """Run on application startup."""
-    print("Tax Filing System API starting up...")
-    print("API documentation available at: http://localhost:8000/api/docs")
-    print("Health check available at: http://localhost:8000/api/health")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run on application shutdown."""
-    print("Tax Filing System API shutting down...")
 
 
 if __name__ == "__main__":

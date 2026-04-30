@@ -1,4 +1,8 @@
-"""SQLAlchemy database models for the Tax Filing System."""
+"""SQLAlchemy database models for the Indian Tax Filing System (ITR-1).
+
+Phase 0: replaces US-shaped tables (W2Form, Form1099, Dependent, TaxForm) with
+Indian-shaped tables (Form16, ITR1Filing) and adds PAN/Aadhaar to User.
+"""
 from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, Text, JSON, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -8,20 +12,26 @@ from app.database import Base
 class User(Base):
     """User account model."""
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+
+    # India identifiers (encrypted at rest via app.security)
+    pan_encrypted = Column(String, nullable=True, index=True)
+    aadhaar_encrypted = Column(String, nullable=True, index=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    tax_forms = relationship("TaxForm", back_populates="owner", cascade="all, delete-orphan")
-    
+    form16s = relationship("Form16", back_populates="user", cascade="all, delete-orphan")
+    filings = relationship("ITR1Filing", back_populates="user", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
 
@@ -29,10 +39,10 @@ class User(Base):
 class UserProfile(Base):
     """User profile with adaptive UI preferences."""
     __tablename__ = "user_profiles"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    
+
     # Adaptive UI Settings
     preferred_mode = Column(String, default="novice")  # novice, intermediate, expert
     interaction_count = Column(Integer, default=0)
@@ -40,190 +50,128 @@ class UserProfile(Base):
     interaction_speed_avg_ms = Column(Integer, default=0)
     error_rate_percent = Column(Float, default=0.0)
     cognitive_load_score = Column(Float, default=0.0)
-    
+
     # User Preferences
-    theme = Column(String, default="light")  # light, dark, auto
+    theme = Column(String, default="light")
     language = Column(String, default="en")
     notifications_enabled = Column(Boolean, default=True)
-    
-    # Tax-specific preferences
-    filing_status_history = Column(JSON, default=list)  # List of past filing statuses
-    preferred_tax_year = Column(Integer)
-    
+
+    # Tax-specific preferences (Indian)
+    preferred_regime = Column(String, default="new")  # "old" | "new"
+    filing_history = Column(JSON, default=list)
+    preferred_assessment_year = Column(String)  # e.g. "2025-26"
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     user = relationship("User", back_populates="profile")
-    
+
     def __repr__(self):
         return f"<UserProfile(user_id={self.user_id}, mode={self.preferred_mode})>"
 
 
-class TaxForm(Base):
-    """Main tax form/return model."""
-    __tablename__ = "tax_forms"
-    
+class Form16(Base):
+    """Extracted Form 16 data. One row per uploaded Form 16 (Indian Part A + Part B)."""
+    __tablename__ = "form16"
+
     id = Column(Integer, primary_key=True, index=True)
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    year = Column(Integer, index=True, nullable=False)
-    filing_status = Column(String)  # single, married_filing_jointly, married_filing_separately, head_of_household
-    status = Column(String, default="in_progress")  # in_progress, completed, filed, accepted, rejected
-    
-    # Form data stored as JSON for flexibility
-    form_data = Column(JSON, default=dict)
-    
-    # Calculated fields
-    total_income = Column(Float, default=0.0)
-    adjusted_gross_income = Column(Float, default=0.0)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assessment_year = Column(String, nullable=False)  # e.g. "2025-26"
+
+    # Part A
+    employer_name = Column(String)
+    employer_tan = Column(String)
+    employer_pan = Column(String)
+    period_from = Column(DateTime)
+    period_to = Column(DateTime)
+    quarter_wise_tds = Column(JSON, default=dict)  # {"q1": 12345, "q2": ...}
+
+    # Part B
+    gross_salary = Column(Float, default=0.0)
+    exempt_allowances = Column(Float, default=0.0)
+    standard_deduction_claimed = Column(Float, default=0.0)
+    professional_tax = Column(Float, default=0.0)
+    deductions_80c = Column(Float, default=0.0)
+    deductions_80d = Column(Float, default=0.0)
+    deductions_other = Column(JSON, default=dict)
+    tds_deducted = Column(Float, default=0.0)
+
+    # Provenance
+    raw_ocr_text = Column(Text)
+    source_document_id = Column(Integer, nullable=True)  # FK in Phase 2 once Document model lands
+    extraction_status = Column(String, default="manual")  # manual | extracted | review_required
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="form16s")
+    filings = relationship("ITR1Filing", back_populates="form16")
+
+    def __repr__(self):
+        return f"<Form16(id={self.id}, employer={self.employer_name}, ay={self.assessment_year})>"
+
+
+class ITR1Filing(Base):
+    """A computed ITR-1 (Sahaj) filing draft."""
+    __tablename__ = "itr1_filings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    form16_id = Column(Integer, ForeignKey("form16.id"), nullable=True)
+
+    assessment_year = Column(String, nullable=False)
+    regime = Column(String, nullable=False)  # "old" | "new"
+
+    # Computed values (from tax_engine_in.compute_filing)
+    gross_income = Column(Float, default=0.0)
     taxable_income = Column(Float, default=0.0)
+    slab_tax = Column(Float, default=0.0)
+    rebate_87a = Column(Float, default=0.0)
+    surcharge = Column(Float, default=0.0)
+    cess = Column(Float, default=0.0)
     total_tax = Column(Float, default=0.0)
-    total_payments = Column(Float, default=0.0)
-    refund_or_amount_owed = Column(Float, default=0.0)
-    
-    # Metadata
+    tds_paid = Column(Float, default=0.0)
+    refund_due = Column(Float, default=0.0)
+    tax_due = Column(Float, default=0.0)
+
+    # Output artefacts
+    itr1_json = Column(JSON, default=dict)
+    pdf_path = Column(String, nullable=True)
+
+    status = Column(String, default="draft")  # draft | computed | finalized
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    filed_at = Column(DateTime(timezone=True))
-    
+
     # Relationships
-    owner = relationship("User", back_populates="tax_forms")
-    dependents = relationship("Dependent", back_populates="tax_form", cascade="all, delete-orphan")
-    w2_forms = relationship("W2Form", back_populates="tax_form", cascade="all, delete-orphan")
-    form_1099s = relationship("Form1099", back_populates="tax_form", cascade="all, delete-orphan")
-    user_inputs = relationship("UserInputData", back_populates="tax_form", cascade="all, delete-orphan")
-    compliance_checks = relationship("ComplianceCheck", back_populates="tax_form", cascade="all, delete-orphan")
-    
+    user = relationship("User", back_populates="filings")
+    form16 = relationship("Form16", back_populates="filings")
+    compliance_checks = relationship("ComplianceCheck", back_populates="filing", cascade="all, delete-orphan")
+
     def __repr__(self):
-        return f"<TaxForm(id={self.id}, year={self.year}, status={self.status})>"
-
-
-class Dependent(Base):
-    """Dependent information model."""
-    __tablename__ = "dependents"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    form_id = Column(Integer, ForeignKey("tax_forms.id"), nullable=False)
-    
-    full_name = Column(String, nullable=False)
-    ssn_encrypted = Column(String, nullable=False)  # Encrypted SSN
-    date_of_birth = Column(DateTime)
-    relationship_type = Column(String)  # child, parent, other - renamed to avoid conflict with SQLAlchemy relationship
-    months_lived_with_taxpayer = Column(Integer)
-    
-    # Qualifying criteria
-    is_qualifying_child = Column(Boolean, default=False)
-    is_qualifying_relative = Column(Boolean, default=False)
-    claimed_by_another = Column(Boolean, default=False)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    tax_form = relationship("TaxForm", back_populates="dependents")
-    
-    def __repr__(self):
-        return f"<Dependent(id={self.id}, name={self.full_name})>"
-
-
-class W2Form(Base):
-    """W-2 form data model."""
-    __tablename__ = "w2_forms"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    form_id = Column(Integer, ForeignKey("tax_forms.id"), nullable=False)
-    
-    employer_name = Column(String, nullable=False)
-    employer_ein = Column(String)
-    
-    # W-2 boxes
-    box_1_wages = Column(Float, default=0.0)
-    box_2_federal_tax_withheld = Column(Float, default=0.0)
-    box_3_social_security_wages = Column(Float, default=0.0)
-    box_4_social_security_tax_withheld = Column(Float, default=0.0)
-    box_5_medicare_wages = Column(Float, default=0.0)
-    box_6_medicare_tax_withheld = Column(Float, default=0.0)
-    box_12_codes = Column(JSON, default=list)  # List of code-amount pairs
-    box_13_checkboxes = Column(JSON, default=dict)  # Retirement plan, etc.
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    tax_form = relationship("TaxForm", back_populates="w2_forms")
-    
-    def __repr__(self):
-        return f"<W2Form(id={self.id}, employer={self.employer_name})>"
-
-
-class Form1099(Base):
-    """1099 form data model (various types)."""
-    __tablename__ = "form_1099s"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    form_id = Column(Integer, ForeignKey("tax_forms.id"), nullable=False)
-    
-    form_type = Column(String, nullable=False)  # 1099-INT, 1099-DIV, 1099-MISC, etc.
-    payer_name = Column(String, nullable=False)
-    payer_ein = Column(String)
-    
-    # Common fields (stored as JSON for flexibility across different 1099 types)
-    form_data = Column(JSON, default=dict)
-    total_amount = Column(Float, default=0.0)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    tax_form = relationship("TaxForm", back_populates="form_1099s")
-    
-    def __repr__(self):
-        return f"<Form1099(id={self.id}, type={self.form_type}, payer={self.payer_name})>"
-
-
-class UserInputData(Base):
-    """Track all user input for audit and analysis."""
-    __tablename__ = "user_input_data"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    form_id = Column(Integer, ForeignKey("tax_forms.id"), nullable=False)
-    
-    field_key = Column(String, nullable=False)  # e.g., "charitable_donations", "mortgage_interest"
-    field_value = Column(Text)  # Store as text, convert as needed
-    field_type = Column(String)  # string, number, date, boolean, etc.
-    
-    # Metadata
-    source = Column(String, default="manual")  # manual, ocr, ai_extracted, imported
-    confidence_score = Column(Float)  # For AI-extracted data
-    
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    tax_form = relationship("TaxForm", back_populates="user_inputs")
-    
-    def __repr__(self):
-        return f"<UserInputData(id={self.id}, field={self.field_key})>"
+        return f"<ITR1Filing(id={self.id}, ay={self.assessment_year}, regime={self.regime}, status={self.status})>"
 
 
 class ComplianceCheck(Base):
-    """Store compliance check results."""
+    """Store compliance check results for an ITR-1 filing."""
     __tablename__ = "compliance_checks"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    form_id = Column(Integer, ForeignKey("tax_forms.id"), nullable=False)
-    
-    check_type = Column(String, nullable=False)  # irs_validation, cross_reference, math_check
+    filing_id = Column(Integer, ForeignKey("itr1_filings.id"), nullable=False)
+
+    check_type = Column(String, nullable=False)  # pan_aadhaar_link, regime_choice_consistency, math_check
     check_name = Column(String, nullable=False)
-    status = Column(String, nullable=False)  # passed, failed, warning
-    
+    status = Column(String, nullable=False)  # passed | failed | warning
+
     message = Column(Text)
     details = Column(JSON, default=dict)
-    
+
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationships
-    tax_form = relationship("TaxForm", back_populates="compliance_checks")
-    
+    filing = relationship("ITR1Filing", back_populates="compliance_checks")
+
     def __repr__(self):
         return f"<ComplianceCheck(id={self.id}, type={self.check_type}, status={self.status})>"
 
@@ -231,19 +179,19 @@ class ComplianceCheck(Base):
 class AuditLog(Base):
     """Comprehensive audit trail for compliance and security."""
     __tablename__ = "audit_logs"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    
-    action = Column(String, nullable=False)  # login, logout, form_created, form_updated, etc.
-    resource_type = Column(String)  # user, tax_form, w2, etc.
+
+    action = Column(String, nullable=False)  # login, logout, filing_created, filing_updated, etc.
+    resource_type = Column(String)  # user, itr1_filing, form16, etc.
     resource_id = Column(Integer)
-    
+
     details = Column(JSON, default=dict)
     ip_address = Column(String)
     user_agent = Column(String)
-    
+
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    
+
     def __repr__(self):
         return f"<AuditLog(id={self.id}, action={self.action}, timestamp={self.timestamp})>"
