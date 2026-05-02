@@ -88,13 +88,13 @@ This project is an autonomous Indian tax filing system. It:
 - Python 3.10+ (tested on 3.14), FastAPI
 - SQLAlchemy 2.0, Pydantic v2
 - PostgreSQL 16 (`pgvector/pgvector:pg16` Docker image)
-- LangGraph + LangChain (OpenAI GPT-4)
+- LangGraph + LangChain (multi-provider: OpenAI / Gemini / Ollama)
 - ReportLab (ITR-1 PDF rendering)
 - pytest + hypothesis (75 tests, 0 warnings)
 
 ### AI / Data
 - **LangGraph** — sole agent orchestration (AutoGen retired in Phase 0)
-- **OpenAI GPT-4** — interviewer / chat
+- **Multi-provider LLM** — Google Gemini, OpenAI GPT-4, or local Ollama; selected via `LLM_PROVIDER` in `.env`
 - **SentenceTransformer all-MiniLM-L6-v2** — local embedding model (no API cost)
 - **pgvector** — vector similarity search (replaces ChromaDB)
 
@@ -142,7 +142,7 @@ python -m uvicorn app.main:app --reload
 
 API runs at `http://localhost:8000`. Docs at `http://localhost:8000/api/docs`. OpenAPI schema at `/api/openapi.json`.
 
-> **OpenAI key**: copy `backend/.env.dev` to `backend/.env` and set `OPENAI_API_KEY` if you want the LangGraph chat flow (`/api/v2/filing/chat/start`). The deterministic endpoints (`/api/v2/calc/preview`, `/api/v2/filing/start`) work without any LLM access.
+> **LLM key**: copy `backend/.env.dev` to `backend/.env` and set `LLM_PROVIDER` + the matching API key (Gemini, OpenAI, or Ollama) if you want the LangGraph chat flow (`/api/v2/filing/chat/start`). The deterministic endpoints (`/api/v2/calc/preview`, `/api/v2/filing/start`) work without any LLM. See `PHASE1_SETUP.md` for all provider options.
 
 ### 3. Frontend setup
 

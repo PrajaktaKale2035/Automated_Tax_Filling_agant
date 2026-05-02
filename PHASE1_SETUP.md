@@ -1,216 +1,296 @@
-# Phase 1 Setup and Testing Guide
+# Setup and Testing Guide
 
 ## Prerequisites
-- Docker Desktop installed
-- Python 3.10+
-- Rust toolchain (optional, for building Rust engine)
 
-## Step 1: Start Infrastructure
+| Requirement | Version | Notes |
+|---|---|---|
+| Docker Desktop | any recent | Runs PostgreSQL with pgvector |
+| Python | 3.10+ | Tested on 3.14; use a venv, never global pip |
+| Node.js | 18+ | Frontend (Vite / Vue 3) |
+| Tesseract OCR | 4+ | Optional — Form 16 upload path only |
 
-```powershell
-# Start Neo4j and PostgreSQL
-docker-compose up -d
+---
 
-# Verify services are running
-docker ps
-# You should see: tax-neo4j, tax-agent-db, tax-agent-pgadmin
+## Step 1: Start the database
 
-# Access Neo4j Browser
-# URL: http://localhost:7474
-# Credentials: neo4j / taxpassword123
+```bash
+# Only postgres is required. pgAdmin is optional. neo4j is unused.
+docker-compose up -d postgres
 
-# Access pgAdmin
-# URL: http://localhost:5050
-# Credentials: admin@taxagent.com / admin123
+# Confirm it is ready
+docker exec tax-agent-db pg_isready -U taxagent
+# postgresql://localhost:5432 - accepting connections
 ```
 
-## Step 2: Install Python Dependencies
+> **Connection string:** `postgresql://taxagent:taxagent_secure_password_2024@localhost:5436/tax_filing_db`
+> Port 5436 on the host maps to 5432 inside the container (see `docker-compose.yml`).
 
-```powershell
-# Navigate to backend
+---
+
+## Step 2: Backend setup
+
+```bash
 cd backend
 
-# Install Phase 1 dependencies
-pip install -r requirements-phase1.txt
+# Create isolated virtual environment (never use global pip)
+python -m venv venv
 
-# Install existing dependencies (keep core functionality)
+# Activate it
+.\venv\Scripts\activate        # Windows PowerShell / cmd
+# source venv/bin/activate     # macOS / Linux
+
 pip install -r requirements.txt
 ```
 
-## Step 3: Initialize Database
+### Configure environment variables
 
-```powershell
-# The init.sql script runs automatically on first container start
-# To manually run migrations:
-docker exec -i tax-agent-db psql -U taxuser -d taxdb < db/init.sql
+Copy the sample and fill in at least one LLM key:
+
+```bash
+cp .env.dev .env    # or just create backend/.env manually
 ```
 
-## Step 4: Ingest Tax Code into Neo4j
+Minimal `.env`:
 
-```powershell
-# Run the knowledge graph ingestion script
-python scripts/ingest_neo4j.py
+```env
+# --- Database (matches docker-compose.yml) ---
+DATABASE_URL=postgresql://taxagent:taxagent_secure_password_2024@localhost:5436/tax_filing_db
 
-# Expected output:
-# 🔧 Building knowledge graph from tax documents...
-# ✅ Knowledge graph created successfully!
+# --- LLM provider (pick ONE of the three blocks below) ---
+
+# Option A: Google Gemini (free tier available)
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_key_here
+GEMINI_MODEL=gemini-flash-lite-latest
+
+# Option B: OpenAI
+# LLM_PROVIDER=openai
+# OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4
+
+# Option C: Ollama (fully local, no API key needed)
+# LLM_PROVIDER=ollama
+# OLLAMA_MODEL=mistral
+# OLLAMA_BASE_URL=http://localhost:11434
+
+# --- Security ---
+SECRET_KEY=replace_this_with_a_random_secret
+# Generate ENCRYPTION_KEY with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=replace_this_with_output_of_above_command
 ```
 
-## Step 5: Build Rust Engine (Optional)
+> **Note:** The chat endpoints (`/api/v2/filing/chat/*`) require a working LLM.
+> The deterministic endpoints (`/api/v2/calc/preview`, `/api/v2/filing/start`) run
+> with no LLM at all — the tax engine is pure Python math.
 
-```powershell
-# Install Rust (if not already installed)
-# https://www.rust-lang.org/tools/install
+### First-time database initialisation
 
-# Install maturin
-pip install maturin
+```bash
+# Create schema (DESTRUCTIVE — drops and recreates all tables)
+python -m scripts.recreate_db --force
 
-# Build the Rust engine
-cd ../rust-engine
-maturin develop --release
+# Ingest the curated FY 2024-25 ITR-1 rulebook into pgvector
+python -m app.rag.ingest
+# Expected: "Ingested 18 chunk(s) from 'tax_rules.txt' into 'itr_rulebook'."
 
-# Verify installation
-python -c "import tax_engine_rs; print(tax_engine_rs.calculate_tax_indian(1000000, 30))"
+# Verify what was ingested
+python -m app.rag.ingest --list
 ```
 
-## Step 6: Run Tests
+### Start the backend
 
-```powershell
-cd ../backend
-
-# Run metamorphic tests
-pytest tests/test_metamorphic.py -v
-
-# Run all tests
-pytest tests/ -v
-
-# Run with coverage
-pytest tests/ --cov=app --cov-report=html
+```bash
+python -m uvicorn app.main:app --reload
 ```
 
-## Step 7: Start Backend (Development)
+API at `http://localhost:8000`. Swagger UI at `http://localhost:8000/api/docs`.
 
-```powershell
-# Option 1: Run existing backend (keeps core functionality)
-uvicorn main:app --reload
+---
 
-# Option 2: Test LangGraph endpoints
-python -m app.agents_v2.graph
+## Step 3: Frontend setup
 
-# The backend will be available at:
-# - Existing API: http://localhost:8000/api/*
-# - New LangGraph API: http://localhost:8000/api/v2/filing/*
+```bash
+# From the project root (not backend/)
+npm install
+npm run dev
 ```
 
-## Testing the Phase 1 Architecture
+Frontend at `http://localhost:5173`.
 
-### Test LangGraph Workflow
+---
 
-```python
-# test_langgraph.py
-import requests
+## Adding more knowledge to the RAG
 
-# Start a new filing session
-response = requests.post("http://localhost:8000/api/v2/filing/start", json={
-    "user_id": "test123",
-    "initial_message": "I earn 12 lakh per year and I'm 35 years old"
-})
+The ingest CLI supports any text or PDF source:
 
-thread_id = response.json()["thread_id"]
-print(f"Thread ID: {thread_id}")
+```bash
+# Show what is currently in the DB
+python -m app.rag.ingest --list
 
-# Continue conversation
-response = requests.post("http://localhost:8000/api/v2/filing/message", json={
-    "thread_id": thread_id,
-    "message": "I want to choose the new tax regime"
-})
+# Re-ingest the default rulebook (replaces collection)
+python -m app.rag.ingest
 
-result = response.json()
-print(f"Tax liability: ₹{result['calculation_result']['tax_liability']}")
+# Add a custom .txt file without wiping existing chunks
+python -m app.rag.ingest --file my_cbdt_circular.txt --append
+
+# Ingest a whole folder of .txt files
+python -m app.rag.ingest --dir extra_rules/ --pattern "*.txt" --append
+
+# Ingest a text-based PDF (install pypdf first; scanned PDFs need Tesseract OCR)
+pip install pypdf
+python -m app.rag.ingest --pdf income_tax_act_chapter4.pdf --append
+
+# Use a separate collection (does not touch itr_rulebook)
+python -m app.rag.ingest --file gst_rules.txt --collection gst_kb
 ```
 
-### Test Rust Engine Directly
+> **Scanned vs text PDFs:** `--pdf` only works on PDFs with selectable text (digital PDFs).
+> Scanned Form 16 images and similar documents must go through
+> `POST /api/documents/upload` which runs Tesseract OCR automatically.
 
-```python
-import tax_engine_rs
+---
 
-# New regime
-result = tax_engine_rs.calculate_tax_indian(
-    income=1250000,
-    age=35,
-    regime="new"
-)
-print(f"New regime tax: ₹{result['tax_liability']}")
+## Step 4: Smoke tests
 
-# Old regime with deductions
-result = tax_engine_rs.calculate_tax_indian(
-    income=1250000,
-    age=35,
-    regime="old",
-    deductions_80c=150000,
-    deductions_80d=25000
-)
-print(f"Old regime tax: ₹{result['tax_liability']}")
+### REST smoke tests
+
+```bash
+# Stateless tax preview (no LLM, no DB write)
+curl -s -X POST http://localhost:8000/api/v2/calc/preview \
+  -H "Content-Type: application/json" \
+  -d '{"gross_income":600000,"deductions":{},"regime":"new","is_salary_income":true}' | python -m json.tool
+# Expected: total_tax = 0  (full Section 87A rebate at 6L income, new regime)
+
+# LangGraph chat start (requires LLM provider configured in .env)
+curl -s -X POST http://localhost:8000/api/v2/filing/chat/start \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":1,"initial_message":"I earn 12 lakh per year"}' | python -m json.tool
+# Expected: research_results array with 6 items, tax_breakdown populated, audit_status: "passed"
+
+# RAG similarity search (no LLM needed)
+curl -s "http://localhost:8000/api/v2/rag/search?q=standard+deduction&k=3" | python -m json.tool
+# Expected: 3 results with section, content, score fields
 ```
 
-### Test GraphRAG Queries
+### Automated test suite
 
-```python
-from llama_index.core import PropertyGraphIndex
-from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
-
-graph_store = Neo4jPropertyGraphStore(
-    username="neo4j",
-    password="taxpassword123",
-    url="bolt://localhost:7687"
-)
-
-# Query the graph
-query_engine = graph_store.as_query_engine()
-response = query_engine.query("What deductions are available for senior citizens?")
-print(response)
+```bash
+cd backend
+python -m pytest tests/ -q
+# Expected: 75 passed, 0 warnings
 ```
 
-## Parallel Architecture Notes
+---
 
-✅ **Core Functionality Preserved**:
-- Existing agents in `src/agents/` remain untouched
-- Existing API routes continue to work
-- Frontend can still use original endpoints
+## Architecture
 
-🆕 **Phase 1 Additions**:
-- New agents in `backend/app/agents_v2/`
-- New API routes at `/api/v2/filing/*`
-- Rust engine as optional performance boost
-- Neo4j as optional knowledge graph
+```
+START
+  └─► interviewer_node   (LLM extracts structured fields; grounded by RAG context)
+          │
+          ▼
+      research_and_calc  (runs researcher + calculator in parallel via asyncio.gather)
+       │            │
+       ▼            ▼
+  researcher_node   calculator_node
+  (pgvector RAG,    (deterministic tax_engine_in,
+   6 chunks)         no LLM arithmetic)
+          │
+          ▼
+      auditor_node   (5 property-based invariants; always ends the graph)
+          │
+         END
+```
+
+### LLM provider selection logic
+
+| `LLM_PROVIDER` env | Keys present | Provider used |
+|---|---|---|
+| `ollama` | any | Ollama (local, no key) |
+| `gemini` | any | Google Gemini |
+| `openai` | any | OpenAI |
+| _(unset)_ | OpenAI key | OpenAI |
+| _(unset)_ | Gemini key only | Gemini |
+| _(unset)_ | neither | Ollama (fallback) |
+
+Change `LLM_PROVIDER` in `backend/.env` to switch providers without touching code.
+
+---
 
 ## Troubleshooting
 
-### Neo4j Connection Error
-```powershell
-# Check if container is running
-docker logs tax-neo4j
+### "connection refused" on startup
 
-# Restart if needed
-docker restart tax-neo4j
+```bash
+# Check DB container is running
+docker ps --filter name=tax-agent-db
+
+# If exited, start it
+docker start tax-agent-db
+
+# Wait for readiness
+docker exec tax-agent-db pg_isready -U taxagent
 ```
 
-### PostgreSQL Extension Error
-```powershell
-# Manually enable pgvector
-docker exec -it tax-agent-db psql -U taxuser -d taxdb
-# IN PSQL:
-CREATE EXTENSION IF NOT EXISTS vector;
-\q
+### LLM quota exhausted (Gemini 429)
+
+Change `GEMINI_MODEL` in `backend/.env` to another available model:
+- `gemini-flash-lite-latest`
+- `gemini-2.5-flash-lite`
+- `gemini-flash-latest`
+- `gemini-pro-latest`
+
+Or switch to `LLM_PROVIDER=ollama` for fully local operation.
+
+### "No connection could be made" (Ollama)
+
+```bash
+# Start Ollama service, then pull the model
+ollama serve
+ollama pull mistral
 ```
 
-### Rust Build Errors
-```powershell
-# Ensure Rust is up to date
-rustup update
+### pgvector extension missing
 
-# Clean and rebuild
-cd rust-engine
-cargo clean
-maturin develop --release
+```bash
+docker exec -it tax-agent-db psql -U taxagent -d tax_filing_db \
+  -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
+
+### RAG sidebar empty / 0 results
+
+```bash
+# Check chunk count
+docker exec -it tax-agent-db psql -U taxagent -d tax_filing_db \
+  -c "SELECT COUNT(*) FROM rag_documents;"
+
+# If 0 rows, re-run ingest
+cd backend && python -m app.rag.ingest
+```
+
+---
+
+## User data isolation
+
+All endpoints that touch user-specific data (filings, Form 16 uploads) require JWT authentication. Key isolation rules:
+
+- **Uploaded files** land in `backend/uploads/{user_id}/{uuid}.ext` — each user has their own subdirectory.
+- **`GET /api/v2/filing/{id}/pdf|json|status`** and **`GET /api/v2/filings`** require a Bearer token and filter to `user_id = current_user.id`. A user cannot access another user's filings.
+- **`GET /api/v2/rag/search`** is open (it queries shared rulebook data — no user data involved).
+- The `rag_documents` table has no `user_id` — it stores shared ITR rulebook chunks, not user-uploaded content.
+
+---
+
+## What is NOT in this project
+
+| Thing | Status |
+|---|---|
+| Rust tax engine (`tax_engine_rs`) | Removed — pure Python `tax_engine_in` used instead |
+| Neo4j / GraphRAG | Not used — pgvector handles all RAG |
+| `requirements-phase1.txt` | Removed — single `requirements.txt` |
+| `scripts/ingest_neo4j.py` | File still exists (legacy) but is not called anywhere |
+| AutoGen agents (`app/autogen_agents/`) | Removed — LangGraph only |
+| US forms (W-2, 1099, Form 1040) | Removed — Indian ITR-1 only |
+| AsyncPostgresSaver (LangGraph) | Deferred to Phase 3+ |
+| E-filing submission to incometax.gov.in | Out of scope |

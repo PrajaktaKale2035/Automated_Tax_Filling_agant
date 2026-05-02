@@ -2,6 +2,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.api.auth import get_current_active_user
 from app.database import get_db
 from app.models import User, ITR1Filing
 
@@ -13,6 +14,10 @@ def _override_db(session):
     def _gen():
         yield session
     app.dependency_overrides[get_db] = _gen
+
+
+def _override_auth(user):
+    app.dependency_overrides[get_current_active_user] = lambda: user
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +117,7 @@ def test_get_filing_pdf_streams_pdf_bytes(db_session):
     db_session.add(user)
     db_session.commit()
     _override_db(db_session)
+    _override_auth(user)
     try:
         client.post("/api/v2/filing/start", json={
             "user_id": 2, "regime": "new",
@@ -132,6 +138,7 @@ def test_get_filing_json_returns_itr1_payload(db_session):
     db_session.add(user)
     db_session.commit()
     _override_db(db_session)
+    _override_auth(user)
     try:
         client.post("/api/v2/filing/start", json={
             "user_id": 3, "regime": "new",
@@ -149,7 +156,9 @@ def test_get_filing_json_returns_itr1_payload(db_session):
 
 
 def test_get_filing_pdf_404_on_missing(db_session):
+    stub_user = User(id=1, email="stub@test.in", hashed_password="x")
     _override_db(db_session)
+    _override_auth(stub_user)
     try:
         resp = client.get("/api/v2/filing/9999999/pdf")
         assert resp.status_code == 404

@@ -7,6 +7,8 @@ interface User {
     full_name: string
 }
 
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+
 export const useAuthStore = defineStore('auth', () => {
     const token = ref<string | null>(localStorage.getItem('token'))
     const user = ref<User | null>(JSON.parse(localStorage.getItem('user') || 'null'))
@@ -19,7 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
         body.append('username', email)
         body.append('password', password)
 
-        const response = await fetch('http://localhost:8000/api/auth/login', {
+        const response = await fetch(`${API_BASE}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body,
@@ -37,7 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
         // The login response only carries the bearer token; fetch the user
         // record so we know id / email / full_name for routing and filing
         // filtering.
-        const meResp = await fetch('http://localhost:8000/api/auth/me', {
+        const meResp = await fetch(`${API_BASE}/api/auth/me`, {
             headers: { Authorization: `Bearer ${data.access_token}` },
         })
         if (meResp.ok) {
@@ -59,7 +61,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function register(email: string, password: string, fullName: string) {
-        const response = await fetch('http://localhost:8000/api/auth/register', {
+        const response = await fetch(`${API_BASE}/api/auth/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

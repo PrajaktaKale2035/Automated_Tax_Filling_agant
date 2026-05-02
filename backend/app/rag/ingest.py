@@ -27,25 +27,47 @@ _DEFAULT_COLLECTION = "itr_rulebook"
 # Two tiers. Specific terms always win over generic ones, regardless of count.
 # Within a tier, ties on count break by priority order.
 _SPECIFIC_KEYWORDS: list[tuple[str, str]] = [
+    # Cess / rebate / surcharge
     ("cess",                 "cess"),
     ("health and education", "cess"),
     ("87a",                  "rebate-87a"),
     ("rebate",               "rebate-87a"),
     ("surcharge",            "surcharge"),
+    # Deductions
     ("80c",                  "80C"),
     ("80d",                  "80D"),
+    ("80tta",                "80TTA"),
+    ("80ttb",                "80TTA"),
+    # HRA / house property (before itr-1 so "house property" section wins)
+    ("hra",                  "hra"),
+    ("house rent",           "hra"),
+    ("house property",       "house-property"),
+    ("24b",                  "house-property"),
+    ("self-occupied",        "house-property"),
+    # Regime comparison (before rebate so comparison chunk wins)
+    ("break-even",           "regime-comparison"),
+    ("when to choose",       "regime-comparison"),
+    # TDS / identity
     ("form 16",              "form-16"),
     ("tds",                  "tds"),
     ("standard deduction",   "standard-deduction"),
     ("pan",                  "identity"),
     ("aadhaar",              "identity"),
+    # Deadline / advance tax
+    ("234f",                 "deadline"),
+    ("july 31",              "deadline"),
+    ("belated",              "deadline"),
+    ("advance tax",          "advance-tax"),
+    ("234b",                 "advance-tax"),
+    ("234c",                 "advance-tax"),
+    # Eligibility (last so more-specific topics above win)
     ("itr-1",                "itr1-eligibility"),
     ("sahaj",                "itr1-eligibility"),
 ]
 
 _GENERIC_KEYWORDS: list[tuple[str, str]] = [
-    ("slab",   "slabs"),
-    ("regime", "slabs"),
+    ("regime",  "slabs"),
+    ("slab",    "slabs"),
 ]
 
 
@@ -173,5 +195,141 @@ def ingest_directory(
 
 
 if __name__ == "__main__":
-    n = ingest_file()
-    print(f"Ingested {n} chunks from {_DEFAULT_DATA_FILE.name} into '{_DEFAULT_COLLECTION}'.")
+    import argparse
+    import sys
+
+    # Ensure UTF-8 output so rupee / special chars don't crash on Windows cp932.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+    parser = argparse.ArgumentParser(
+        prog="python -m app.rag.ingest",
+        description=(
+            "Ingest content into the pgvector ITR rulebook collection.\n\n"
+            "With no flags, ingests the default tax_rules.txt (FY 2024-25 / AY 2025-26)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python -m app.rag.ingest                          # default tax_rules.txt\n"
+            "  python -m app.rag.ingest --list                   # show what is in the DB\n"
+            "  python -m app.rag.ingest --file my_rules.txt      # replace with custom file\n"
+            "  python -m app.rag.ingest --file extra.txt --append # add without wiping\n"
+            "  python -m app.rag.ingest --dir docs/ --pattern *.txt --append\n"
+            "  python -m app.rag.ingest --pdf income_tax_act.pdf  # requires: pip install pypdf\n"
+            "  python -m app.rag.ingest --collection custom_kb --file kb.txt\n"
+        ),
+    )
+
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--file", metavar="PATH",
+        help="Ingest a single .txt file (replaces collection unless --append)",
+    )
+    source.add_argument(
+        "--dir", metavar="PATH",
+        help="Ingest every file matching --pattern inside a directory",
+    )
+    source.add_argument(
+        "--pdf", metavar="PATH",
+        help="Ingest a text-based PDF (requires: pip install pypdf). "
+             "Scanned/image PDFs produce no text - run Tesseract OCR first.",
+    )
+    source.add_argument(
+        "--list", action="store_true",
+        help="Print all chunks currently stored in the collection and exit",
+    )
+
+    parser.add_argument(
+        "--collection", default=_DEFAULT_COLLECTION, metavar="NAME",
+        help=f"Collection name to read/write (default: {_DEFAULT_COLLECTION})",
+    )
+    parser.add_argument(
+        "--pattern", default="*.txt", metavar="GLOB",
+        help="File glob pattern used with --dir (default: *.txt)",
+    )
+    parser.add_argument(
+        "--append", action="store_true",
+        help="Add chunks to the collection instead of replacing it",
+    )
+
+    args = parser.parse_args()
+    replace = not args.append
+
+    # ---- --list --------------------------------------------------------------
+    if args.list:
+        from app.database import SessionLocal
+        from app.models import RagDocument as _RD
+        _db = SessionLocal()
+        rows = (
+            _db.query(_RD.source, _RD.topic, _RD.chunk_index)
+            .filter(_RD.collection == args.collection)
+            .order_by(_RD.source, _RD.chunk_index)
+            .all()
+        )
+        _db.close()
+        if not rows:
+            print(f"Collection '{args.collection}' is empty (or does not exist).")
+        else:
+            print(f"Collection '{args.collection}' - {len(rows)} chunk(s):")
+            for r in rows:
+                print(f"  [{r.chunk_index:>3}]  {r.source:<40}  topic={r.topic or '-'}")
+        sys.exit(0)
+
+    # ---- --pdf ---------------------------------------------------------------
+    if args.pdf:
+        pdf_path = Path(args.pdf)
+        if not pdf_path.exists():
+            print(f"ERROR: file not found: {pdf_path}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            print(
+                "ERROR: PDF ingestion requires pypdf.\n"
+                "  pip install pypdf\n"
+                "Then re-run this command.\n"
+                "\nTip: pypdf works on text-based PDFs only. For scanned PDFs\n"
+                "(Form 16 images, etc.) use the /api/documents/upload endpoint\n"
+                "which runs Tesseract OCR automatically.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        reader = PdfReader(str(pdf_path))
+        text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        if not text.strip():
+            print(
+                "WARNING: no text extracted from PDF. It may be a scanned/image PDF.\n"
+                "Use Tesseract OCR (via /api/documents/upload) instead.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        n = ingest_text(
+            text,
+            source=pdf_path.name,
+            collection=args.collection,
+            replace_collection=replace,
+        )
+        print(f"Ingested {n} chunk(s) from PDF '{pdf_path.name}' into '{args.collection}'.")
+        sys.exit(0)
+
+    # ---- --dir ---------------------------------------------------------------
+    if args.dir:
+        n = ingest_directory(
+            args.dir,
+            collection=args.collection,
+            pattern=args.pattern,
+            replace_collection=replace,
+        )
+        print(
+            f"Ingested {n} chunk(s) from '{args.dir}' "
+            f"(pattern={args.pattern}) into '{args.collection}'."
+        )
+        sys.exit(0)
+
+    # ---- --file or default ---------------------------------------------------
+    target = Path(args.file) if args.file else _DEFAULT_DATA_FILE
+    n = ingest_file(target, collection=args.collection, replace_collection=replace)
+    print(f"Ingested {n} chunk(s) from '{target.name}' into '{args.collection}'.")

@@ -42,23 +42,40 @@ def _gemini_api_key() -> str:
 
 
 def _build_llm(temperature: float = 0.3):
-    """Pick an LLM based on which API key is available.
+    """Pick an LLM based on LLM_PROVIDER env var or available API keys.
 
-    Priority:
-      1. LLM_PROVIDER env var ('openai' | 'gemini') if set
-      2. OpenAI if OPENAI_API_KEY is set
-      3. Gemini if GEMINI_API_KEY / GOOGLE_API_KEY is set
-    Free-tier Gemini default model is `gemini-flash-lite-latest` (override via GEMINI_MODEL).
+    Selection priority:
+      1. LLM_PROVIDER='ollama'  → local Ollama (no key needed)
+      2. LLM_PROVIDER='gemini'  → Google Gemini API
+      3. LLM_PROVIDER='openai'  → OpenAI API
+      4. Auto-detect: OpenAI key present → OpenAI
+      5. Auto-detect: Gemini key present → Gemini
+      6. Fallback                → Ollama (fully local, no key required)
+
+    Env vars:
+      LLM_PROVIDER     : 'ollama' | 'gemini' | 'openai'  (optional)
+      OLLAMA_MODEL     : default 'mistral'
+      OLLAMA_BASE_URL  : default 'http://localhost:11434'
+      GEMINI_MODEL     : default 'gemini-flash-lite-latest'
+      OPENAI_MODEL     : default 'gpt-4'
     """
     provider = (os.getenv("LLM_PROVIDER") or "").strip().lower()
     openai_key = _openai_api_key()
     gemini_key = _gemini_api_key()
 
+    # ---- Ollama (local, no API key needed) ----------------------------------
+    if provider == "ollama" or (not provider and not openai_key and not gemini_key):
+        from langchain_ollama import ChatOllama
+        model = os.getenv("OLLAMA_MODEL", "mistral")
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        return ChatOllama(model=model, temperature=temperature, base_url=base_url)
+
+    # ---- Gemini API ---------------------------------------------------------
     if provider == "gemini" or (not provider and not openai_key and gemini_key):
         from langchain_google_genai import ChatGoogleGenerativeAI
         model = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
-        # max_retries=0 so 429 / 503 surfaces immediately instead of looping
-        # for minutes (the UI's fetch will time out otherwise).
+        # max_retries=0 so 429/503 surfaces immediately instead of looping for
+        # minutes and timing out the UI fetch.
         return ChatGoogleGenerativeAI(
             model=model,
             temperature=temperature,
@@ -66,6 +83,7 @@ def _build_llm(temperature: float = 0.3):
             max_retries=0,
         )
 
+    # ---- OpenAI API ---------------------------------------------------------
     from langchain_openai import ChatOpenAI
     return ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4"),
@@ -78,7 +96,7 @@ def _build_llm(temperature: float = 0.3):
 # Node 1: Interviewer - structured extraction from natural language
 # ----------------------------------------------------------------------------
 
-_INTERVIEWER_SYSTEM = SystemMessage(content="""\
+_INTERVIEWER_SYSTEM_PROMPT = """\
 You are a tax filing assistant for INDIAN ITR-1 (FY 2024-25 / AY 2025-26).
 Extract any of these fields the user has mentioned and return them as JSON:
 - income_salary (integer INR)
@@ -93,10 +111,46 @@ Extract any of these fields the user has mentioned and return them as JSON:
 Output format: a single JSON object on the LAST line of your reply, prefixed
 with `EXTRACTION:`. Above that line, reply conversationally - acknowledge what
 the user said and ask for any missing information needed to compute their tax.
+When answering tax rule questions, cite specific amounts from the rulebook context below.
 
 Example final line:
 EXTRACTION: {"income_salary": 1200000, "regime": "old"}
-""")
+"""
+
+
+def _build_interviewer_messages(state: "TaxFilingState", llm: Any) -> list:
+    """Build the LLM message list for the interviewer, injecting RAG context.
+
+    research_results from the previous graph turn are appended to the system
+    prompt so the LLM can give rulebook-grounded answers (e.g. exact cess
+    rate, 87A threshold, 80C cap) instead of relying on training-data memory.
+    """
+    history = list(state.get("messages", []))
+
+    research_results = state.get("research_results") or []
+    if research_results:
+        snippets = "\n".join(
+            f"  [{r.get('section', 'general')}] {r.get('description', '')[:300]}"
+            for r in research_results[:5]
+        )
+        rag_block = (
+            "\n\n--- Relevant ITR Rulebook (cite these when answering tax questions) ---\n"
+            + snippets
+            + "\n---"
+        )
+    else:
+        rag_block = ""
+
+    system_content = _INTERVIEWER_SYSTEM_PROMPT + rag_block
+
+    model_name = (getattr(llm, "model", "") or "").lower()
+    if "gemma" in model_name and history:
+        first = history[0]
+        merged = HumanMessage(
+            content=f"{system_content}\n\n---\n\nUser: {first.content}"
+        )
+        return [merged] + history[1:]
+    return [SystemMessage(content=system_content)] + history
 
 
 def _parse_extraction(text: str) -> Dict[str, Any]:
@@ -133,28 +187,43 @@ def _response_text(response: Any) -> str:
 
 
 async def interviewer_node(state: TaxFilingState) -> Dict[str, Any]:
-    """Extract structured user data from the conversation history."""
+    """Extract structured user data; grounds answers in ITR rulebook via RAG context.
+
+    LLM errors (quota exhausted, model unavailable) are caught and returned as
+    a friendly message so the graph continues to the researcher node and the
+    RAG sidebar still populates even when the LLM is down.
+    """
     import asyncio as _aio
 
-    llm = _build_llm(temperature=0.3)
-
-    history = list(state.get("messages", []))
-    # Gemma models on the Gemini API reject SystemMessage with
-    # "Developer instruction is not enabled". For those, fold the system
-    # prompt into the first HumanMessage instead.
-    model_name = (getattr(llm, "model", "") or "").lower()
-    if "gemma" in model_name and history:
-        first = history[0]
-        merged = HumanMessage(
-            content=f"{_INTERVIEWER_SYSTEM.content}\n\n---\n\nUser: {first.content}"
+    response_text = ""
+    try:
+        # _build_llm and _build_interviewer_messages are inside the try so that
+        # any httpx/transport error during model init is also caught gracefully.
+        llm = _build_llm(temperature=0.3)
+        messages = _build_interviewer_messages(state, llm)
+        # ainvoke (async) with a 30s timeout so a stale Gemini connection never
+        # blocks the event loop indefinitely.
+        response = await _aio.wait_for(llm.ainvoke(messages), timeout=30.0)
+        response_text = _response_text(response)
+    except _aio.TimeoutError:
+        response_text = (
+            "⚠️ LLM timed out (>30s). Returning RAG results only — "
+            "check the rulebook sources on the right for your answer."
         )
-        messages = [merged] + history[1:]
-    else:
-        messages = [_INTERVIEWER_SYSTEM] + history
-    # llm.invoke is sync (httpx blocking call inside) - run it on a worker
-    # thread so the event loop can keep serving other requests.
-    response = await _aio.to_thread(llm.invoke, messages)
-    response_text = _response_text(response)
+    except Exception as llm_err:
+        err_msg = str(llm_err)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower():
+            response_text = (
+                "⚠️ LLM quota exhausted. Returning RAG results only — "
+                "check the rulebook sources on the right for your answer."
+            )
+        elif "503" in err_msg or "UNAVAILABLE" in err_msg or "disconnected" in err_msg.lower():
+            response_text = (
+                "⚠️ LLM temporarily unavailable. Showing RAG sources only — "
+                "please retry in a moment."
+            )
+        else:
+            response_text = f"⚠️ LLM error: {err_msg[:120]}. RAG sources are still available on the right."
 
     extracted = _parse_extraction(response_text)
     user_profile = dict(state.get("user_profile") or {})

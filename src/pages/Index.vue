@@ -62,7 +62,8 @@ const fetchDashboard = async () => {
   error.value = null
   try {
     const userId = authStore.user?.id || 1 // Fallback to 1 for dev/testing if not logged in
-    const response = await fetch(`http://localhost:8000/api/sdui/dashboard/${userId}`)
+    const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+    const response = await fetch(`${apiBase}/api/sdui/dashboard/${userId}`)
     if (!response.ok) {
       throw new Error('Failed to fetch dashboard configuration')
     }

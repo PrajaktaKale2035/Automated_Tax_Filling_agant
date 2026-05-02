@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.api.auth import get_current_active_user
 from app.database import get_db
 from app.models import User, ITR1Filing
 
@@ -124,6 +125,7 @@ def test_full_phase0_pipeline_via_api(db_session):
     def _gen():
         yield db_session
     app.dependency_overrides[get_db] = _gen
+    app.dependency_overrides[get_current_active_user] = lambda: user
 
     try:
         # Start

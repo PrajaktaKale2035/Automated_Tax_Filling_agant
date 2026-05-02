@@ -15,7 +15,11 @@ from app.api import auth, users, sdui, ws, documents, filing_v2
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup — ensure pgvector extension exists before create_all tries to
+    # build the Vector(384) column on rag_documents. Safe no-op if already set.
+    from sqlalchemy import text as _text
+    with engine.begin() as _conn:
+        _conn.execute(_text("CREATE EXTENSION IF NOT EXISTS vector;"))
     Base.metadata.create_all(bind=engine)
     print("Tax Filing System API starting up (Indian ITR-1 / FY2024-25)...")
     print("API documentation available at: http://localhost:8000/api/docs")

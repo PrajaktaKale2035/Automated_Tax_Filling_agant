@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.auth import get_current_active_user
 from app.database import get_db
 from app.models import ITR1Filing, User, Form16
 from app.services.tax_engine_in import compute_filing
@@ -213,8 +214,12 @@ async def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @router.get("/filing/{filing_id}/pdf")
-def get_filing_pdf(filing_id: int, db: Session = Depends(get_db)):
-    filing = db.query(ITR1Filing).filter_by(id=filing_id).one_or_none()
+def get_filing_pdf(
+    filing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    filing = db.query(ITR1Filing).filter_by(id=filing_id, user_id=current_user.id).one_or_none()
     if not filing or not filing.pdf_path:
         raise HTTPException(status_code=404, detail="filing or PDF not found")
     return FileResponse(
@@ -225,8 +230,12 @@ def get_filing_pdf(filing_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/filing/{filing_id}/json")
-def get_filing_json(filing_id: int, db: Session = Depends(get_db)):
-    filing = db.query(ITR1Filing).filter_by(id=filing_id).one_or_none()
+def get_filing_json(
+    filing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    filing = db.query(ITR1Filing).filter_by(id=filing_id, user_id=current_user.id).one_or_none()
     if not filing:
         raise HTTPException(status_code=404, detail="filing not found")
     return filing.itr1_json
@@ -237,16 +246,18 @@ def get_filing_json(filing_id: int, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @router.get("/filings")
-def list_filings(user_id: Optional[int] = None, db: Session = Depends(get_db)):
-    """List all ITR-1 filings, optionally filtered by user_id.
-
-    Returns rows in descending creation order. Currently unauthenticated; use
-    `user_id` query to filter to a specific user. Add auth in Phase 4+.
-    """
-    query = db.query(ITR1Filing).order_by(ITR1Filing.created_at.desc())
-    if user_id is not None:
-        query = query.filter(ITR1Filing.user_id == user_id)
-    rows = query.limit(100).all()
+def list_filings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List the authenticated user's ITR-1 filings in descending creation order."""
+    rows = (
+        db.query(ITR1Filing)
+        .filter(ITR1Filing.user_id == current_user.id)
+        .order_by(ITR1Filing.created_at.desc())
+        .limit(100)
+        .all()
+    )
     return [
         {
             "id": r.id,
@@ -305,8 +316,12 @@ def rag_search(q: str, k: int = 5, topic: Optional[str] = None):
 # ---------------------------------------------------------------------------
 
 @router.get("/filing/{filing_id}/status")
-def get_filing_status(filing_id: int, db: Session = Depends(get_db)):
-    filing = db.query(ITR1Filing).filter_by(id=filing_id).one_or_none()
+def get_filing_status(
+    filing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    filing = db.query(ITR1Filing).filter_by(id=filing_id, user_id=current_user.id).one_or_none()
     if not filing:
         raise HTTPException(status_code=404, detail="filing not found")
     return {
@@ -402,6 +417,8 @@ async def chat_message(req: ChatMessageRequest):
     from app.agents_v2.graph import tax_filing_graph
 
     config = {"configurable": {"thread_id": req.thread_id}}
+
+    # Verify thread exists before invoking
     try:
         snapshot = await tax_filing_graph.aget_state(config)
     except Exception as e:
@@ -409,12 +426,13 @@ async def chat_message(req: ChatMessageRequest):
     if not snapshot or not snapshot.values:
         raise HTTPException(status_code=404, detail=f"thread {req.thread_id} not found")
 
-    updated = {
-        **snapshot.values,
-        "messages": list(snapshot.values.get("messages", [])) + [HumanMessage(content=req.message)],
-    }
+    # Pass only the new message — InMemorySaver loads the checkpoint state and
+    # the add_messages reducer appends the new message to the existing history.
     try:
-        result = await tax_filing_graph.ainvoke(updated, config=config)
+        result = await tax_filing_graph.ainvoke(
+            {"messages": [HumanMessage(content=req.message)]},
+            config=config,
+        )
     except Exception as e:
         msg = str(e)
         if "RESOURCE_EXHAUSTED" in msg or "429" in msg:

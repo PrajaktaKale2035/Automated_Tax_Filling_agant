@@ -93,3 +93,77 @@ Tax Rules for FY 2024-25 (AY 2025-26) - Indian Income Tax (ITR-1 / Sahaj)
       (interest, family pension), and agricultural income up to Rs 5,000
     NOT eligible if you have capital gains, business income, multiple house
     properties, foreign income/assets, or are a director in a company.
+
+12. HRA (House Rent Allowance) Exemption - Old Regime Only:
+    Salaried employees in rented accommodation claim HRA exemption under
+    Section 10(13A). The exemption is the MINIMUM of three values:
+    - Actual HRA received from employer
+    - 50% of basic salary (metro cities: Delhi, Mumbai, Kolkata, Chennai)
+      OR 40% of basic salary (all non-metro cities)
+    - Actual rent paid minus 10% of basic salary
+    HRA exemption is NOT available under the new regime.
+    Mandatory: rent receipts; landlord PAN required if annual rent > Rs 1,00,000.
+    If employee owns a house in the same city, HRA exemption is disallowed.
+
+13. Income from House Property (Allowed in ITR-1 - One Property Only):
+    ITR-1 permits income from one self-occupied OR one let-out property.
+    Self-Occupied Property:
+    - Annual value treated as NIL.
+    - Home loan interest deductible up to Rs 2,00,000 under Section 24(b)
+      in OLD regime. Under new regime this deduction is NOT available.
+    Let-Out Property:
+    - Gross annual rent is taxable income under "House Property".
+    - Standard deduction of 30% of net annual value allowed for repairs.
+    - Full home loan interest deductible (no upper cap) under Section 24(b).
+    NOT eligible for ITR-1: two or more house properties (must use ITR-2).
+
+14. Savings Bank Interest and Section 80TTA / 80TTB - Old Regime Only:
+    Interest earned on savings bank accounts, FDs, and RDs is taxable as
+    "Income from Other Sources". Deductions available in OLD regime:
+    - Section 80TTA: Deduction up to Rs 10,000 on savings bank interest only.
+      Available to individuals and HUFs below age 60.
+    - Section 80TTB: Deduction up to Rs 50,000 on ALL interest income
+      (savings bank + fixed deposits + recurring deposits).
+      Available ONLY to SENIOR CITIZENS (age 60 and above).
+    FD interest is NOT covered by 80TTA; it is fully taxable for non-seniors.
+    80TTA and 80TTB are NOT available under the new regime.
+
+15. Regime Comparison - When to Choose Old vs New (FY 2024-25):
+    The new regime is the DEFAULT for FY 2024-25; opt-out explicitly for old.
+    New regime advantages:
+    - Lower slab rates; standard deduction Rs 75,000 (vs Rs 50,000 old).
+    - Tax-free up to Rs 7,00,000 income due to 87A rebate (Rs 25,000).
+    - Simpler; no need to maintain investment proofs.
+    Old regime is beneficial when total deductions exceed roughly Rs 3,75,000:
+    - 80C up to Rs 1,50,000 (PPF, ELSS, LIC, EPF, etc.)
+    - 80D up to Rs 25,000 - Rs 1,00,000 (health insurance)
+    - HRA exemption (varies by salary and rent)
+    - Home loan interest up to Rs 2,00,000 under 24(b)
+    - 80TTA/80TTB (savings / FD interest deduction)
+    Break-even rule of thumb: if total deductions > Rs 3,75,000, old regime
+    saves more tax for incomes above Rs 10 lakh. Below Rs 7 lakh, new regime
+    is almost always better because of the Rs 25,000 full rebate under 87A.
+
+16. ITR-1 Filing Deadline and Late Filing Penalty (AY 2025-26):
+    Original due date: July 31, 2025 (for FY 2024-25 / AY 2025-26).
+    Belated return: Filed after July 31 but before December 31, 2025.
+    Late filing fee under Section 234F:
+    - Rs 1,000 if total income is up to Rs 5,00,000.
+    - Rs 5,000 if total income exceeds Rs 5,00,000.
+    Interest under Section 234A: 1% per month on unpaid tax from due date.
+    Revised return: Allowed until December 31, 2025 to correct mistakes.
+    e-Verification: Mandatory within 30 days of filing using Aadhaar OTP,
+    net banking, DEMAT account, or send signed ITR-V to CPC Bengaluru.
+    Unverified returns are treated as NOT filed.
+
+17. Advance Tax (Applicable when Tax Due > Rs 10,000):
+    If total tax liability minus TDS exceeds Rs 10,000, advance tax is mandatory.
+    Installment schedule (percentage of total annual tax liability):
+    - 15% by June 15
+    - 45% by September 15
+    - 75% by December 15
+    - 100% by March 15
+    Salaried employees whose employer deducts 100% TDS are usually exempt.
+    Interest under Section 234B: 1% per month if advance tax < 90% of liability.
+    Interest under Section 234C: 1% per month on shortfall at each installment.
+    Advance tax is the same for both old and new regime.

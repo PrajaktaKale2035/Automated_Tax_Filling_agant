@@ -1,6 +1,6 @@
 # Backend Development Status
 
-> **Updated 2026-05-01.** This document originally tracked the US-tax-filing
+> **Updated 2026-05-02.** This document originally tracked the US-tax-filing
 > prototype phase work. The historical sections below are kept for context, but
 > the canonical current status is the section directly below. For the full
 > migration changelog see [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md).
@@ -9,15 +9,17 @@
 
 ## Current Status — Phase 0-4 complete (Indian ITR-1)
 
-**Date:** 2026-05-01
+**Date:** 2026-05-02
 **Branch:** `develop`
 **Status:** 🟢 End-to-end Indian ITR-1 pipeline operational. 75/75 tests pass, 0 warnings.
 
 ### What works end-to-end
 - Deterministic Indian tax engine (`backend/app/services/tax_engine_in.py`)
 - Indian ITR-1 schema in Postgres — 7 tables (see `app/models.py`)
-- **pgvector** RAG over the curated FY 2024-25 rulebook (replaces ChromaDB)
+- **pgvector** RAG over the curated FY 2024-25 rulebook — 17 sections (~18 chunks)
 - LangGraph workflow: interviewer -> researcher -> calculator -> auditor (AutoGen retired)
+- Multi-provider LLM in `nodes.py`: Gemini / OpenAI / Ollama — switch via `LLM_PROVIDER` in `.env`
+- `interviewer_node` uses `await asyncio.wait_for(llm.ainvoke(), timeout=30)` — proper async, cancellable, with graceful error messages on quota/timeout/disconnect
 - Form 16 OCR upload + structured extraction -> `form16` table
 - ITR-1 JSON in IT Dept schema + ITR-1 PDF (INR Indian grouping)
 - WebSocket `filing.starting / .calculating / .complete` events keyed to `client_id`

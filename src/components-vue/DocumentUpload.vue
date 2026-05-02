@@ -108,7 +108,8 @@ const uploadDocument = async () => {
   formData.append('file', file.value)
 
   try {
-    const response = await fetch('http://localhost:8000/api/documents/upload', {
+    const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+    const response = await fetch(`${apiBase}/api/documents/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authStore.token}`

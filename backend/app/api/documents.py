@@ -35,12 +35,12 @@ async def upload_document(
       - if Form 16 detected: form16_id, extraction_status='extracted', confidence
       - else: extraction_status='ocr_only'
     """
-    if not os.path.exists(UPLOAD_DIR):
-        os.makedirs(UPLOAD_DIR)
+    user_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
+    os.makedirs(user_dir, exist_ok=True)
 
     file_ext = os.path.splitext(file.filename or "")[1]
     filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    file_path = os.path.join(user_dir, filename)
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
