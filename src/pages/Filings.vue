@@ -1,17 +1,16 @@
 <template>
   <DynamicLayoutContainer>
     <div class="max-w-6xl mx-auto space-y-6">
-      <!-- Page Header -->
       <BackButton />
       <div class="flex justify-between items-center">
         <div class="space-y-2">
-          <h1 class="text-3xl font-bold">My Tax Filings</h1>
-          <p class="text-muted-foreground">View and manage your tax returns</p>
+          <h1 class="text-3xl font-bold">My ITR-1 Filings</h1>
+          <p class="text-muted-foreground">View and manage your Indian tax returns (FY 2024-25 / AY 2025-26)</p>
         </div>
         <div class="space-x-2">
-          <Button @click="simulateEfiling" :disabled="isSubmitting" variant="default" class="bg-green-600 hover:bg-green-700">
-            <Send class="mr-2 h-4 w-4" />
-            {{ isSubmitting ? 'Filing...' : 'E-File Now' }}
+          <Button @click="refresh" variant="outline">
+            <ArrowLeft class="mr-2 h-4 w-4 rotate-180" />
+            Refresh
           </Button>
           <Button @click="router.push('/filing/new')">
             <PlusCircle class="mr-2 h-4 w-4" />
@@ -20,76 +19,94 @@
         </div>
       </div>
 
-      <!-- Filings List -->
-      <div class="grid gap-4">
-        <Card 
+      <div v-if="loadError" class="rounded-md border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
+        {{ loadError }}
+      </div>
+
+      <div v-if="loading" class="text-center py-12 text-muted-foreground">
+        Loading filings...
+      </div>
+
+      <div v-else class="grid gap-4">
+        <Card
           v-for="filing in filings" :key="filing.id"
-          class="hover:shadow-md transition-shadow cursor-pointer"
-          @click="viewFiling(filing.id)"
+          class="hover:shadow-md transition-shadow"
         >
           <CardHeader>
             <div class="flex justify-between items-start">
               <div class="space-y-1">
-                <CardTitle>Tax Year {{ filing.year }}</CardTitle>
+                <CardTitle>AY {{ filing.assessment_year }} &middot; {{ filing.regime.toUpperCase() }} regime</CardTitle>
                 <div class="text-sm text-muted-foreground">
-                  Filed on {{ new Date(filing.filedDate).toLocaleDateString() }}
+                  Filing #{{ filing.id }} &middot; created {{ filing.created_at ? new Date(filing.created_at).toLocaleString('en-IN') : '-' }}
                 </div>
               </div>
-              <div 
+              <div
                 :class="cn(
                   'px-3 py-1 rounded-full text-xs font-medium',
-                  filing.status === 'accepted' && 'bg-green-100 text-green-700',
-                  filing.status === 'in_progress' && 'bg-blue-100 text-blue-700',
+                  filing.status === 'finalized' && 'bg-green-100 text-green-700',
+                  filing.status === 'computed' && 'bg-blue-100 text-blue-700',
                   filing.status === 'draft' && 'bg-gray-100 text-gray-700'
                 )"
               >
-                {{ filing.status.replace('_', ' ').toUpperCase() }}
+                {{ filing.status.toUpperCase() }}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
               <div>
-                <div class="text-muted-foreground">Filing Status</div>
-                <div class="font-medium">{{ filing.filingStatus }}</div>
+                <div class="text-muted-foreground">Gross Income</div>
+                <div class="font-medium">&#8377;{{ filing.gross_income.toLocaleString('en-IN') }}</div>
               </div>
               <div>
-                <div class="text-muted-foreground">Total Income</div>
-                <div class="font-medium">₹{{ filing.totalIncome.toLocaleString() }}</div>
+                <div class="text-muted-foreground">Taxable Income</div>
+                <div class="font-medium">&#8377;{{ filing.taxable_income.toLocaleString('en-IN') }}</div>
               </div>
               <div>
-                <div class="text-muted-foreground">Tax Liability</div>
-                <div class="font-medium">₹{{ filing.taxLiability.toLocaleString() }}</div>
+                <div class="text-muted-foreground">Total Tax</div>
+                <div class="font-medium">&#8377;{{ filing.total_tax.toLocaleString('en-IN') }}</div>
               </div>
               <div>
-                <div class="text-muted-foreground">Refund/Owed</div>
-                <div :class="cn('font-medium', filing.refundAmount >= 0 ? 'text-green-600' : 'text-red-600')">
-                  {{ filing.refundAmount >= 0 ? '+' : '' }}₹{{ Math.abs(filing.refundAmount).toLocaleString() }}
+                <div class="text-muted-foreground">{{ filing.tax_due > 0 ? 'Tax Due' : 'Refund' }}</div>
+                <div :class="cn('font-medium', filing.tax_due === 0 ? 'text-green-600' : 'text-red-600')">
+                  &#8377;{{ Math.max(filing.tax_due, filing.refund_due).toLocaleString('en-IN') }}
                 </div>
               </div>
             </div>
-            <div class="flex justify-end">
+            <div class="flex flex-wrap gap-2 justify-end">
+              <Button variant="outline" size="sm" @click.stop="downloadPdf(filing.id)">
+                <Download class="mr-2 h-4 w-4" />
+                Download PDF
+              </Button>
               <Button variant="outline" size="sm" @click.stop="exportJSON(filing.id)">
                 <Download class="mr-2 h-4 w-4" />
-                Export JSON
+                Export ITR-1 JSON
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                class="bg-green-600 hover:bg-green-700 text-white"
+                :disabled="submittingId === filing.id"
+                @click.stop="submitToITDepartment(filing.id)"
+              >
+                <Send class="mr-2 h-4 w-4" />
+                {{ submittingId === filing.id ? 'Preparing...' : 'E-File (Stub)' }}
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        <!-- Empty State -->
-        <Card v-if="filings.length === 0" class="p-12 text-center">
+        <Card v-if="!loading && filings.length === 0" class="p-12 text-center">
           <FileText class="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 class="text-lg font-semibold mb-2">No Tax Filings Yet</h3>
-          <p class="text-muted-foreground mb-6">Start your first tax filing to see it here</p>
+          <h3 class="text-lg font-semibold mb-2">No filings yet</h3>
+          <p class="text-muted-foreground mb-6">Start your first ITR-1 to see it here.</p>
           <Button @click="router.push('/filing/new')">
             <PlusCircle class="mr-2 h-4 w-4" />
-            Create New Filing
+            Create new filing
           </Button>
         </Card>
       </div>
 
-      <!-- Back Button -->
       <Button variant="outline" @click="router.push('/dashboard')">
         <ArrowLeft class="mr-2 h-4 w-4" />
         Back to Dashboard
@@ -99,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, PlusCircle, FileText, Send, Download } from 'lucide-vue-next'
 import BackButton from '@/components-vue/navigation/BackButton.vue'
@@ -110,113 +127,124 @@ import CardTitle from '@/components-vue/ui/CardTitle.vue'
 import CardContent from '@/components-vue/ui/CardContent.vue'
 import Button from '@/components-vue/ui/Button.vue'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
+
+interface ITR1Filing {
+  id: number
+  user_id: number
+  form16_id: number | null
+  assessment_year: string
+  regime: 'old' | 'new'
+  status: string
+  gross_income: number
+  taxable_income: number
+  total_tax: number
+  tds_paid: number
+  refund_due: number
+  tax_due: number
+  pdf_path: string | null
+  created_at: string | null
+}
+
+const API_BASE =
+  (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
 
 const router = useRouter()
-const isSubmitting = ref(false)
-const isExporting = ref(false)
+const authStore = useAuthStore()
 
-// Mock data - in a real app, this would come from an API
-const filings = ref([
-  {
-    id: 1,
-    year: 2023,
-    filedDate: '2024-03-15',
-    status: 'accepted',
-    filingStatus: 'Single',
-    totalIncome: 1500000,
-    taxLiability: 180000,
-    refundAmount: 12000
-  },
-  {
-    id: 2,
-    year: 2022,
-    filedDate: '2023-03-10',
-    status: 'accepted',
-    filingStatus: 'Single',
-    totalIncome: 1350000,
-    taxLiability: 150000,
-    refundAmount: -5000
+const loading = ref(true)
+const loadError = ref('')
+const filings = ref<ITR1Filing[]>([])
+const submittingId = ref<number | null>(null)
+
+const refresh = async () => {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const userId = authStore.user?.id
+    const url = userId
+      ? `${API_BASE}/api/v2/filings?user_id=${userId}`
+      : `${API_BASE}/api/v2/filings`
+    const resp = await fetch(url)
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}))
+      throw new Error(body.detail || `HTTP ${resp.status}`)
+    }
+    filings.value = await resp.json()
+  } catch (e: any) {
+    loadError.value = e.message || 'Failed to load filings'
+  } finally {
+    loading.value = false
   }
-])
+}
 
-const viewFiling = (id: number) => {
-  // In a real app, this would navigate to a detailed filing view
-  console.log('Viewing filing:', id)
+const downloadPdf = async (id: number) => {
+  try {
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/pdf`)
+    if (!resp.ok) throw new Error(`PDF unavailable (HTTP ${resp.status})`)
+    const blob = await resp.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ITR1-filing-${id}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  } catch (e: any) {
+    alert(e.message)
+  }
 }
 
 const exportJSON = async (id: number) => {
-  isExporting.value = true
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch(`http://localhost:8000/api/filing/export/${id}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      alert(`Export failed: ${errorData.detail || 'Unknown error'}`)
-      return
-    }
-
-    // Handle JSON download
-    const blob = await response.blob()
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`)
+    if (!resp.ok) throw new Error(`JSON unavailable (HTTP ${resp.status})`)
+    const data = await resp.json()
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `ITR-1_Export_${id}.json`
+    a.download = `ITR1-filing-${id}.json`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
     document.body.removeChild(a)
-    
-    alert('Export successful! JSON downloaded.')
-    
-  } catch (error) {
-    console.error('Export error:', error)
-    alert('An error occurred during export.')
-  } finally {
-    isExporting.value = false
+  } catch (e: any) {
+    alert(e.message)
   }
 }
 
-const simulateEfiling = async () => {
-  isSubmitting.value = true
+const submitToITDepartment = async (id: number) => {
+  submittingId.value = id
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch('http://localhost:8000/api/filing/submit', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      alert(`Filing failed: ${errorData.detail || 'Unknown error'}`)
-      return
-    }
-
-    // Handle PDF download
-    const blob = await response.blob()
+    // E-filing to incometax.gov.in is not yet integrated. As a stub, we
+    // download the IT-Dept-shaped ITR-1 JSON so the user can upload it manually
+    // through the official portal's "Upload XML/JSON" path.
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`)
+    if (!resp.ok) throw new Error(`Filing not ready (HTTP ${resp.status})`)
+    const data = await resp.json()
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `TaxReturn_2024.pdf`
+    a.download = `ITR1-AY${data.assessmentYear}-filing-${id}.json`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
     document.body.removeChild(a)
-    
-    alert('Filing submitted successfully! PDF downloaded.')
-    
-  } catch (error) {
-    console.error('E-filing error:', error)
-    alert('An error occurred during e-filing.')
+    alert(
+      'ITR-1 JSON downloaded.\n\n' +
+      'Real e-filing (submission to incometax.gov.in) is on the roadmap. ' +
+      'For now, log in at incometax.gov.in and upload this JSON via ' +
+      '"e-File > File Income Tax Return > Upload Pre-filled JSON".'
+    )
+  } catch (e: any) {
+    alert(`E-filing failed: ${e.message}`)
   } finally {
-    isSubmitting.value = false
+    submittingId.value = null
   }
 }
+
+onMounted(refresh)
 </script>

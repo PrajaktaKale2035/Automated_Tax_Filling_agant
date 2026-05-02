@@ -4,6 +4,7 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";   -- pgvector: required for RagDocument.embedding
 
 -- Create schema for better organization
 CREATE SCHEMA IF NOT EXISTS tax_data;

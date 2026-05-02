@@ -1,96 +1,133 @@
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+"""ITR-1 (Sahaj) PDF renderer. Replaces the prior US tax-return generator.
+
+Pure rendering - no tax calculations. All numbers must be pre-computed by
+`tax_engine_in`.
+"""
 from io import BytesIO
-from datetime import datetime
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer,
+)
 
-def generate_tax_return_pdf(user_data: dict, tax_data: dict) -> bytes:
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+
+def _rs(amount: float) -> str:
+    """Format a rupee value with Indian grouping: Rs 12,34,567."""
+    n = int(round(amount))
+    sign = "-" if n < 0 else ""
+    n = abs(n)
+    s = str(n)
+    if len(s) <= 3:
+        return f"Rs {sign}{s}"
+    last3 = s[-3:]
+    rest = s[:-3]
+    grouped = ""
+    while len(rest) > 2:
+        grouped = "," + rest[-2:] + grouped
+        rest = rest[:-2]
+    grouped = rest + grouped
+    return f"Rs {sign}{grouped},{last3}"
+
+
+def generate_itr1_pdf(payload: dict) -> BytesIO:
+    """Render an ITR-1 PDF from the same payload shape used by build_itr1_json.
+
+    Sections:
+      1. Personal Info (PAN, name, AY)
+      2. Income from Salary
+      3. Deductions
+      4. Tax Computation (regime breakdown)
+      5. Taxes Paid (TDS)
+      6. Net Position
+    """
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=15*mm, rightMargin=15*mm,
+                            topMargin=15*mm, bottomMargin=15*mm)
     styles = getSampleStyleSheet()
-    story = []
+    h1 = ParagraphStyle("h1", parent=styles["Heading1"], fontSize=16, spaceAfter=8)
+    h2 = ParagraphStyle("h2", parent=styles["Heading2"], fontSize=12, spaceAfter=6)
 
-    # Title
-    title_style = styles['Heading1']
-    story.append(Paragraph(f"Tax Return Summary - {datetime.now().year}", title_style))
-    story.append(Spacer(1, 12))
+    user = payload["user"]
+    salary = payload["salary"]
+    ded = payload.get("deductions", {})
+    tb = payload["tax_breakdown"]
 
-    # User Info
-    story.append(Paragraph("Taxpayer Information", styles['Heading2']))
-    user_info = [
-        ["Name", f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}"],
-        ["Email", user_data.get('email', '')],
-        ["Filing Status", tax_data.get('filing_status', 'Single')]
+    elems = [
+        Paragraph("ITR-1 (Sahaj) - Tax Computation Summary", h1),
+        Paragraph(f"Assessment Year: {payload['assessment_year']}", styles["Normal"]),
+        Paragraph(f"Regime: {payload['regime'].upper()}", styles["Normal"]),
+        Spacer(1, 6),
+        Paragraph("1. Personal Information", h2),
+        Table([
+            ["Name", user.get("name", "")],
+            ["PAN", user.get("pan", "")],
+            ["Aadhaar", user.get("aadhaar", "") or "-"],
+        ], colWidths=[40*mm, 120*mm]),
+        Spacer(1, 8),
+        Paragraph("2. Income from Salary", h2),
+        Table([
+            ["Gross Salary", _rs(salary.get("gross", 0))],
+        ], colWidths=[80*mm, 80*mm]),
+        Spacer(1, 8),
+        Paragraph("3. Deductions", h2),
+        Table([
+            ["Section 80C", _rs(ded.get("80c", 0))],
+            ["Section 80D", _rs(ded.get("80d", 0))],
+        ], colWidths=[80*mm, 80*mm]),
+        Spacer(1, 8),
+        Paragraph("4. Tax Computation", h2),
+        Table([
+            ["Taxable Income",     _rs(tb["taxable_income"])],
+            ["Slab Tax",           _rs(tb["slab_tax"])],
+            ["Rebate u/s 87A",     _rs(tb["rebate_87a"])],
+            ["Surcharge",          _rs(tb["surcharge"])],
+            ["Health & Edu Cess",  _rs(tb["cess"])],
+            ["Total Tax Liability", _rs(tb["total_tax"])],
+        ], colWidths=[80*mm, 80*mm], style=TableStyle([
+            ("BACKGROUND", (0, -1), (-1, -1), colors.lightgrey),
+            ("FONTNAME",   (0, -1), (-1, -1), "Helvetica-Bold"),
+        ])),
+        Spacer(1, 8),
+        Paragraph("5. Taxes Paid (TDS)", h2),
+        Table([
+            ["TDS Deducted", _rs(salary.get("tds", 0))],
+        ], colWidths=[80*mm, 80*mm]),
+        Spacer(1, 8),
+        Paragraph("6. Net Position", h2),
+        Table([
+            ["Tax Due (positive) / Refund (negative)",
+             _rs(tb["total_tax"] - salary.get("tds", 0))],
+        ], colWidths=[120*mm, 40*mm]),
     ]
-    t = Table(user_info, colWidths=[150, 300])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    story.append(t)
-    story.append(Spacer(1, 12))
 
-    # Income Summary
-    story.append(Paragraph("Income Summary", styles['Heading2']))
-    income_data = [["Source", "Amount"]]
-    total_income = 0
-    
-    # W-2s
-    for w2 in tax_data.get('w2s', []):
-        amount = float(w2.get('wages', 0))
-        income_data.append([f"W-2: {w2.get('employer', 'Unknown')}", f"${amount:,.2f}"])
-        total_income += amount
-        
-    # 1099s
-    for form1099 in tax_data.get('form1099s', []):
-        amount = float(form1099.get('amount', 0))
-        income_data.append([f"1099: {form1099.get('payer', 'Unknown')}", f"${amount:,.2f}"])
-        total_income += amount
+    doc.build(elems)
+    buf.seek(0)
+    return buf
 
-    income_data.append(["Total Income", f"${total_income:,.2f}"])
 
-    t_income = Table(income_data, colWidths=[300, 150])
-    t_income.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    story.append(t_income)
-    story.append(Spacer(1, 12))
-
-    # Tax Calculation (Mock)
-    story.append(Paragraph("Tax Calculation", styles['Heading2']))
-    tax_rate = 0.20  # Flat 20% for simplicity
-    tax_due = total_income * tax_rate
-    
-    calc_data = [
-        ["Total Income", f"${total_income:,.2f}"],
-        ["Tax Rate", "20%"],
-        ["Estimated Tax Due", f"${tax_due:,.2f}"]
-    ]
-    
-    t_calc = Table(calc_data, colWidths=[300, 150])
-    t_calc.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.yellow)
-    ]))
-    story.append(t_calc)
-    
-    # Disclaimer
-    story.append(Spacer(1, 24))
-    disclaimer_style = ParagraphStyle('Disclaimer', parent=styles['Normal'], fontSize=8, textColor=colors.grey)
-    story.append(Paragraph("This is a generated summary for demonstration purposes only. Not a legal tax document.", disclaimer_style))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.getvalue()
+# Backwards-compat alias for any caller still importing the old name.
+def generate_tax_return_pdf(user_data: dict, tax_data: dict) -> BytesIO:
+    """DEPRECATED: kept temporarily to avoid breaking imports during the migration.
+    New code should call generate_itr1_pdf with a normalized payload."""
+    payload = {
+        "user": {
+            "pan": user_data.get("pan", ""),
+            "aadhaar": user_data.get("aadhaar"),
+            "name": user_data.get("name", ""),
+        },
+        "assessment_year": tax_data.get("assessment_year", "2025-26"),
+        "regime": tax_data.get("regime", "new"),
+        "salary": {
+            "gross": tax_data.get("gross_income", 0),
+            "tds": tax_data.get("tds", 0),
+        },
+        "deductions": tax_data.get("deductions", {}),
+        "tax_breakdown": tax_data.get("tax_breakdown", {
+            "taxable_income": 0, "slab_tax": 0, "rebate_87a": 0,
+            "surcharge": 0, "cess": 0, "total_tax": 0,
+        }),
+    }
+    return generate_itr1_pdf(payload)

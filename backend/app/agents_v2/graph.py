@@ -4,11 +4,23 @@ LangGraph Workflow Definition for Tax Filing
 This is the "brain" of the Phase 1 architecture.
 It orchestrates the 4 agent nodes in a cyclic, stateful manner.
 """
+import asyncio
+
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import InMemorySaver
+
 from .state import TaxFilingState
 from .nodes import interviewer_node, researcher_node, calculator_node, auditor_node
-import os
+
+
+async def research_and_calc_node(state):
+    """Run researcher + calculator in parallel - they share state but
+    don't depend on each other's output."""
+    research_result, calc_result = await asyncio.gather(
+        researcher_node(state),
+        calculator_node(state),
+    )
+    return {**research_result, **calc_result, "current_agent": "research_and_calc"}
 
 
 # ============================================================================
@@ -16,40 +28,25 @@ import os
 # ============================================================================
 
 def should_continue_to_end(state: TaxFilingState) -> str:
+    """Always end after the auditor.
+
+    Previously looped back to research_and_calc on audit failure, but the
+    calculator is deterministic — re-running with the same profile produces
+    the same result, causing an infinite loop to the recursion limit. Audit
+    errors are surfaced in the API response for the frontend to display.
     """
-    Determines if the workflow should loop back or end.
-    
-    If audit fails, route back to researcher for re-evaluation.
-    If audit passes, end the workflow.
-    """
-    audit_status = state.get("audit_status")
-    
-    if audit_status == "failed":
-        # Audit found errors - route back to researcher
-        return "researcher"
-    else:
-        # Audit passed - end workflow
-        return "end"
+    return "end"
 
 
 def route_after_interviewer(state: TaxFilingState) -> str:
+    """Always proceed to research_and_calc after the interviewer.
+
+    Previously gated on income_salary + age being present, which meant purely
+    informational questions ("What is HRA?") never reached the researcher and
+    the RAG sidebar always showed empty. Now every message gets RAG context and
+    a tax computation (calculator defaults to 0 income when not yet provided).
     """
-    Determines if we have enough information to proceed.
-    
-    If user_profile is incomplete, stay in interviewer mode.
-    Otherwise, proceed to researcher.
-    """
-    user_profile = state.get("user_profile", {})
-    
-    # Check if essential fields are present
-    required_fields = ["income_salary", "age"]
-    has_required = all(field in user_profile for field in required_fields)
-    
-    if has_required:
-        return "researcher"
-    else:
-        # Need more information - stay in interviewer
-        return "interviewer"
+    return "researcher"
 
 
 # ============================================================================
@@ -71,53 +68,38 @@ def create_tax_filing_graph():
     # Initialize the graph
     workflow = StateGraph(TaxFilingState)
     
-    # Add nodes
+    # Add nodes - research_and_calc fans out researcher+calculator in parallel
     workflow.add_node("interviewer", interviewer_node)
-    workflow.add_node("researcher", researcher_node)
-    workflow.add_node("calculator", calculator_node)
+    workflow.add_node("research_and_calc", research_and_calc_node)
     workflow.add_node("auditor", auditor_node)
-    
-    # Set entry point
+
     workflow.set_entry_point("interviewer")
-    
-    # Define edges
-    # Conditional: interviewer -> researcher (if data complete) OR stay in interviewer
+
+    # interviewer -> research_and_calc (if data complete) OR stay in interviewer
     workflow.add_conditional_edges(
         "interviewer",
         route_after_interviewer,
         {
-            "interviewer": "interviewer",  # Loop back if incomplete
-            "researcher": "researcher"
-        }
+            "interviewer": "interviewer",
+            "researcher": "research_and_calc",  # historical name kept in router
+        },
     )
-    
-    # Linear flow: researcher -> calculator -> auditor
-    workflow.add_edge("researcher", "calculator")
-    workflow.add_edge("calculator", "auditor")
-    
-    # Conditional: auditor -> END (if passed) OR -> researcher (if failed)
+
+    workflow.add_edge("research_and_calc", "auditor")
+
     workflow.add_conditional_edges(
         "auditor",
         should_continue_to_end,
         {
-            "researcher": "researcher",  # Cycle back to re-research
-            "end": END
-        }
+            "researcher": "research_and_calc",
+            "end": END,
+        },
     )
     
-    # Set up PostgreSQL checkpointing for persistence
-    db_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql://taxuser:taxpass123@localhost:5433/taxdb"
-    )
-    
-    try:
-        checkpointer = PostgresSaver.from_conn_string(db_url)
-        print(f"✅ LangGraph checkpointing enabled with PostgreSQL")
-    except Exception as e:
-        print(f"⚠️  PostgreSQL checkpointing unavailable: {e}")
-        print("   Running without persistence (in-memory only)")
-        checkpointer = None
+    # Phase 0: in-memory checkpointing.
+    # Phase 3 will switch to AsyncPostgresSaver with `async with` lifecycle
+    # (the PostgresSaver context-manager API doesn't fit module-level wiring).
+    checkpointer = InMemorySaver()
     
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

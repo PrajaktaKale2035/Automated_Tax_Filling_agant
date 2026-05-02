@@ -47,3 +47,7 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+
+# Runtime artefacts (generated PDFs, uploaded docs, ChromaDB persistence)
+backend/app/uploads/
+backend/chroma_db/

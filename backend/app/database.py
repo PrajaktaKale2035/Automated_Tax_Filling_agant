@@ -1,5 +1,5 @@
 """Database configuration and session management."""
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
 import os
@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://taxagent:taxagent_secure_password_2024@localhost:5432/tax_filing_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://taxagent:taxagent_secure_password_2024@localhost:5436/tax_filing_db")
 
 # Create SQLAlchemy engine with connection pooling
 engine = create_engine(
@@ -70,7 +70,7 @@ def check_db_connection():
     """
     try:
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         return True
     except Exception as e:

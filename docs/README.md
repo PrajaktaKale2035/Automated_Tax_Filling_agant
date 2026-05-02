@@ -1,211 +1,96 @@
-# 📚 Tax Filing AI Agent - Documentation Index
+# Documentation Index — Indian Tax Filing AI Agent
 
-Welcome to the Tax Filing AI Agent documentation! This guide will help you navigate through all available documentation.
+This is the documentation hub for the Indian ITR-1 (Sahaj) tax filing system,
+FY 2024-25 / AY 2025-26.
+
+> **First time on the project?** Read [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md) —
+> it explains the US-to-India migration so older PRs and historical commit
+> messages remain readable.
 
 ---
 
-## 📂 Documentation Structure
+## Layout
 
 ```
 docs/
-├── setup/          # Installation and setup guides
-├── guides/         # Feature guides and tutorials
-└── api/            # API reference and technical docs
+├── README.md               # This index
+├── MIGRATION_NOTES.md      # US -> India changelog (read first if catching up)
+├── PROJECT_STRUCTURE.md    # Directory layout and table schema
+├── BACKEND_STATUS.md       # Phase status snapshot
+├── setup/                  # Database setup
+├── guides/                 # Developer how-tos
+├── api/                    # REST API reference
+└── superpowers/            # Design specs, audits, plans (history)
 ```
 
 ---
 
-## 🚀 Setup & Installation
+## Setup and installation
 
-**Start here if you're setting up the project for the first time:**
+Start at the project root and follow these in order:
 
-1. **[Quick Database Setup](setup/QUICKSTART_DATABASE.md)** ⭐ **START HERE**
-   - Fast track to get PostgreSQL running
-   - Automated setup scripts
-   - Troubleshooting tips
-
-2. **[PostgreSQL Installation (Windows)](setup/POSTGRESQL_INSTALLATION_WINDOWS.md)**
-   - Detailed Windows installation guide
-   - Manual installation steps
-   - Service management
-   - Connection verification
-
-3. **[PostgreSQL Setup Guide](setup/POSTGRESQL_SETUP.md)**
-   - General PostgreSQL configuration
-   - Database creation
-   - User management
-   - Security best practices
+1. **[`PHASE1_SETUP.md`](../PHASE1_SETUP.md)** — full setup guide for a fresh
+   machine. Covers Docker, venv, `.env` template, all three LLM providers
+   (Ollama / Gemini / OpenAI), first-time DB init, smoke tests, troubleshooting.
+2. **[`setup/QUICKSTART_DATABASE.md`](setup/QUICKSTART_DATABASE.md)** —
+   Postgres + pgvector (Docker or local install).
+3. **[`setup/POSTGRESQL_INSTALLATION_WINDOWS.md`](setup/POSTGRESQL_INSTALLATION_WINDOWS.md)** —
+   Windows-specific notes when not using Docker.
+4. **[`setup/POSTGRESQL_SETUP.md`](setup/POSTGRESQL_SETUP.md)** —
+   manual Postgres configuration.
 
 ---
 
-## 📖 User Guides
+## Developer guides
 
-**Learn how to use the system's features:**
-
-1. **[LangChain Integration](guides/LANGCHAIN_INTEGRATION.md)**
-   - Multi-agent workflow system (8000+ words)
-   - Architecture overview
-   - Agent configuration
-   - Tool usage examples
-   - Troubleshooting
-
-2. **[LangChain Quick Start](guides/LANGCHAIN_QUICKSTART.md)**
-   - Quick setup guide
-   - Basic usage examples
-   - Common patterns
-   - Testing workflows
-
-3. **[AI Provider Switching](guides/HOW_TO_SWITCH_PROVIDERS.md)**
-   - Change between AI providers
-   - OpenAI, Anthropic, Gemini setup
-   - Provider comparison
-   - Configuration guide
+| Guide | When to read |
+|---|---|
+| [`guides/RAG_KNOWLEDGE_BASE.md`](guides/RAG_KNOWLEDGE_BASE.md) | Adding new content (text or PDF) to the ITR rulebook RAG |
+| [`guides/UPDATING_FOR_NEW_FY.md`](guides/UPDATING_FOR_NEW_FY.md) | When the Union Budget changes slabs / deductions for the next FY |
 
 ---
 
-## 🔧 API & Technical Reference
+## API reference
 
-**For developers building on or extending the system:**
+| Doc | Covers |
+|---|---|
+| [`api/API_REFERENCE.md`](api/API_REFERENCE.md) | All REST endpoints, request/response schemas |
+| [`api/AUTHENTICATION.md`](api/AUTHENTICATION.md) | JWT login flow, Bearer-token usage, protected vs public endpoints |
 
-1. **[API Reference](api/API_REFERENCE.md)**
-   - Complete REST API documentation
-   - Endpoint specifications
-   - Request/response schemas
-   - Authentication flow
-
-2. **[Agent System Summary](api/AGENT_SYSTEM_SUMMARY.md)**
-   - Multi-agent architecture
-   - Agent types and responsibilities
-   - Communication patterns
-   - Workflow orchestration
-
-3. **[LLM Provider Implementation](api/LLM_PROVIDERS_IMPLEMENTATION.md)**
-   - Provider abstraction layer
-   - Implementation details
-   - Adding new providers
-   - Provider-specific features
+Live OpenAPI when the backend is running:
+- Swagger UI: <http://localhost:8000/api/docs>
+- OpenAPI JSON: <http://localhost:8000/api/openapi.json>
 
 ---
 
-## 🎯 Quick Navigation by Task
+## Architecture and history
 
-### I want to...
-
-**Set up the database**
-→ [Quick Database Setup](setup/QUICKSTART_DATABASE.md)
-
-**Install PostgreSQL on Windows**
-→ [PostgreSQL Installation (Windows)](setup/POSTGRESQL_INSTALLATION_WINDOWS.md)
-
-**Use the multi-agent system**
-→ [LangChain Integration](guides/LANGCHAIN_INTEGRATION.md)
-
-**Switch AI providers (OpenAI, Anthropic, etc.)**
-→ [AI Provider Switching](guides/HOW_TO_SWITCH_PROVIDERS.md)
-
-**Build API integrations**
-→ [API Reference](api/API_REFERENCE.md)
-
-**Understand the agent architecture**
-→ [Agent System Summary](api/AGENT_SYSTEM_SUMMARY.md)
+| Doc | Purpose |
+|---|---|
+| [`MIGRATION_NOTES.md`](MIGRATION_NOTES.md) | What changed in the US-to-India migration |
+| [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) | File and directory map, DB tables |
+| [`BACKEND_STATUS.md`](BACKEND_STATUS.md) | Current backend status, what works end-to-end |
+| [`superpowers/`](superpowers/) | Original design specs, broken-pipelines audit, Phase 0 plan |
 
 ---
 
-## 📊 Documentation Status
+## Quick navigation by task
 
-| Document | Status | Last Updated | Completeness |
-|----------|--------|--------------|--------------|
-| Quick Database Setup | ✅ Complete | Nov 2025 | 100% |
-| PostgreSQL (Windows) | ✅ Complete | Nov 2025 | 100% |
-| PostgreSQL Setup | ✅ Complete | Nov 2025 | 100% |
-| LangChain Integration | ✅ Complete | Nov 2025 | 100% |
-| LangChain Quick Start | ✅ Complete | Nov 2025 | 100% |
-| Provider Switching | ✅ Complete | Nov 2025 | 100% |
-| API Reference | 🚧 Draft | Nov 2025 | 60% |
-| Agent System | ✅ Complete | Nov 2025 | 100% |
-| LLM Providers | ✅ Complete | Nov 2025 | 100% |
+| I want to... | Start here |
+|---|---|
+| Set up the project on a fresh machine | [`PHASE1_SETUP.md`](../PHASE1_SETUP.md) |
+| Add a new tax rulebook section | [`guides/RAG_KNOWLEDGE_BASE.md`](guides/RAG_KNOWLEDGE_BASE.md) |
+| Update for FY 2025-26 (next year's budget) | [`guides/UPDATING_FOR_NEW_FY.md`](guides/UPDATING_FOR_NEW_FY.md) |
+| Authenticate against the API | [`api/AUTHENTICATION.md`](api/AUTHENTICATION.md) |
+| Read the request/response shape of any endpoint | [`api/API_REFERENCE.md`](api/API_REFERENCE.md) |
+| Understand the LangGraph workflow | [`../walkthrough.md`](../walkthrough.md) |
+| Switch LLM providers (Ollama / Gemini / OpenAI) | [`PHASE1_SETUP.md`](../PHASE1_SETUP.md) — "LLM provider selection logic" |
 
 ---
 
-## 🆘 Getting Help
+## Out of scope (deferred)
 
-### Common Issues
-
-**Database Connection Failed**
-→ See [Troubleshooting](setup/QUICKSTART_DATABASE.md#troubleshooting) in Quick Database Setup
-
-**Agent Not Responding**
-→ Check [LangChain Troubleshooting](guides/LANGCHAIN_INTEGRATION.md#troubleshooting)
-
-**API Authentication Errors**
-→ Review [API Reference](api/API_REFERENCE.md#authentication)
-
-### Still Need Help?
-
-1. Check the specific guide related to your issue
-2. Look for troubleshooting sections in each guide
-3. Create an issue on GitHub with:
-   - What you were trying to do
-   - What happened instead
-   - Error messages (if any)
-   - Your environment (OS, Python version, etc.)
-
----
-
-## 🤝 Contributing to Documentation
-
-Found a typo? Want to improve a guide? Contributions welcome!
-
-**Documentation Guidelines:**
-- Use clear, concise language
-- Include code examples
-- Add troubleshooting sections
-- Keep formatting consistent
-- Update this index when adding new docs
-
----
-
-## 📝 Document Conventions
-
-**Emoji Guide:**
-- 🚀 **Quick Start** - Get started fast
-- ⭐ **Recommended** - Best starting point
-- 🚧 **In Progress** - Work in progress
-- ✅ **Complete** - Fully documented
-- ⚠️ **Important** - Critical information
-- 💡 **Tip** - Helpful suggestion
-- 🔧 **Technical** - Advanced/technical content
-
-**Code Blocks:**
-- `bash` - Terminal commands
-- `python` - Python code
-- `typescript` - TypeScript/JavaScript code
-- `sql` - SQL queries
-- `json` - JSON configuration
-
----
-
-## 📅 Documentation Roadmap
-
-### Coming Soon
-- [ ] Deployment guide (Docker, Kubernetes)
-- [ ] Frontend development guide
-- [ ] Testing guide
-- [ ] Security best practices
-- [ ] Performance tuning
-- [ ] Troubleshooting FAQ
-
-### In Progress
-- [ ] Complete API reference
-- [ ] AutoGen integration guide
-- [ ] Vector database setup
-
----
-
-<div align="center">
-
-**Need more help?** Visit the [main README](../README.md)
-
-**Found an issue?** [Report it on GitHub](https://github.com/RADson2005official/tax-fluent-chat/issues)
-
-</div>
+- Real IT Department PDF ingestion (Income Tax Act, ITR-1 instructions, Finance Act)
+  — currently uses the curated `backend/tax_rules.txt` (29 sections).
+- E-filing submission to incometax.gov.in.
+- `AsyncPostgresSaver` for LangGraph checkpointing — currently `InMemorySaver`.

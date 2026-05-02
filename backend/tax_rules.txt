@@ -1,29 +1,409 @@
-Tax Rules for FY 2024-25 (AY 2025-26)
+Tax Rules for FY 2024-25 (AY 2025-26) - Indian Income Tax (ITR-1 / Sahaj)
 
-1. Income Tax Slabs (New Regime):
-   - Up to ₹3,00,000: Nil
-   - ₹3,00,001 to ₹7,00,000: 5%
-   - ₹7,00,001 to ₹10,00,000: 10%
-   - ₹10,00,001 to ₹12,00,000: 15%
-   - ₹12,00,001 to ₹15,00,000: 20%
-   - Above ₹15,00,000: 30%
+1. Income Tax Slabs (New Regime, default for FY 2024-25):
+   The new regime is the default tax regime for individuals filing ITR-1.
+   - Up to Rs 3,00,000: Nil
+   - Rs 3,00,001 to Rs 7,00,000: 5%
+   - Rs 7,00,001 to Rs 10,00,000: 10%
+   - Rs 10,00,001 to Rs 12,00,000: 15%
+   - Rs 12,00,001 to Rs 15,00,000: 20%
+   - Above Rs 15,00,000: 30%
 
-2. Standard Deduction:
-   - Standard deduction for salaried employees has been increased to ₹75,000 under the New Tax Regime.
+2. Income Tax Slabs (Old Regime, optional):
+   Taxpayers may opt out of the new regime and choose the old regime to claim
+   deductions like 80C / 80D / HRA / LTA. Old regime slabs are stiffer.
+   - Up to Rs 2,50,000: Nil
+   - Rs 2,50,001 to Rs 5,00,000: 5%
+   - Rs 5,00,001 to Rs 10,00,000: 20%
+   - Above Rs 10,00,000: 30%
 
-3. Section 80C (Old Regime Only):
-   - Deduction up to ₹1,50,000 for investments in PPF, EPF, LIC, ELSS, etc.
+3. Standard Deduction (Salaried & Pensioners):
+   - New Regime: Rs 75,000 (raised in Budget 2024 from Rs 50,000).
+   - Old Regime: Rs 50,000.
+   Applied automatically against gross salary; no proof needed.
 
-4. Section 80D (Old Regime Only):
-   - Deduction for health insurance premiums:
-     - Self & Family: Up to ₹25,000 (₹50,000 if senior citizen)
-     - Parents: Up to ₹25,000 (₹50,000 if senior citizen)
+4. Section 80C - Investments and Specified Payments (Old Regime Only):
+   Maximum deduction Rs 1,50,000 per financial year. Eligible instruments:
+   - Public Provident Fund (PPF)
+   - Employee Provident Fund (EPF)
+   - Equity Linked Savings Scheme (ELSS) mutual funds
+   - Life Insurance Premium (LIC)
+   - 5-year tax-saving fixed deposits
+   - National Savings Certificate (NSC)
+   - Sukanya Samriddhi Yojana
+   - Repayment of housing loan principal
+   - Children's tuition fees (up to two children)
+   80C is NOT available under the new regime.
 
-5. Rebate under Section 87A:
-   - New Regime: Tax rebate up to ₹25,000 for income up to ₹7,00,000.
-   - Old Regime: Tax rebate up to ₹12,500 for income up to ₹5,00,000.
+5. Section 80D - Health Insurance Premium (Old Regime Only):
+   Deduction for medical insurance premiums paid for self, family, and parents.
+   - Self, spouse, dependent children: up to Rs 25,000
+     (Rs 50,000 if any insured person is a senior citizen, age 60+)
+   - Parents: up to Rs 25,000 additional
+     (Rs 50,000 additional if parents are senior citizens, age 60+)
+   - Preventive health check-up: Rs 5,000 sub-limit within above caps.
+   80D is NOT available under the new regime.
 
-6. Surcharge:
-   - 10% for income above ₹50 Lakhs
-   - 15% for income above ₹1 Crore
-   - 25% for income above ₹2 Crores (New Regime capped at 25%)
+6. Section 87A Rebate:
+   A tax rebate that reduces tax liability to zero up to a threshold.
+   - New Regime (FY 2024-25): rebate of up to Rs 25,000 if total income is up
+     to Rs 7,00,000. Effectively makes income up to Rs 7L tax-free.
+   - Old Regime (FY 2024-25): rebate of up to Rs 12,500 if total income is up
+     to Rs 5,00,000. Effectively makes income up to Rs 5L tax-free.
+   Available to resident individuals only (not HUFs / non-residents).
+
+7. Surcharge on Income Tax:
+   Additional levy on the tax amount (NOT on income) for high-income earners.
+   - 10% surcharge: total income above Rs 50 lakh, up to Rs 1 crore
+   - 15% surcharge: total income above Rs 1 crore, up to Rs 2 crore
+   - 25% surcharge: total income above Rs 2 crore (new regime cap)
+   - 37% surcharge: applies only in the OLD regime above Rs 5 crore
+     (the new regime caps surcharge at 25%, no 37% slab).
+   Marginal relief is provided so that surcharge does not push net tax above
+   the slab boundary by more than the excess income.
+
+8. Health and Education Cess:
+   A flat 4% cess is levied on (basic income tax + surcharge), regardless of
+   regime, age, or income level. The cess funds national health and primary
+   education programs.
+   Formula: total tax payable = (slab tax - 87A rebate + surcharge) * 1.04
+   Example: if slab tax after rebate is Rs 1,00,000 and surcharge is Rs 0,
+   the cess is 4% of Rs 1,00,000 = Rs 4,000, total Rs 1,04,000.
+
+9. TDS (Tax Deducted at Source) and Form 16:
+   Form 16 is the salary TDS certificate issued by an employer at year-end.
+   It contains:
+   - Part A: TAN of employer, PAN of employee, quarterly TDS deposit details.
+   - Part B: gross salary, exemptions u/s 10, deductions u/s 16, taxable
+     income, slab tax, rebate, cess, total tax, TDS deducted.
+   When filing ITR-1, the TDS shown in Form 16 / Form 26AS is credited
+   against the computed tax liability. Excess TDS results in a refund;
+   shortfall results in tax due.
+
+10. PAN and Aadhaar Linkage:
+    - PAN (Permanent Account Number): 10-character alphanumeric ID, mandatory
+      for filing ITR. Format: 5 letters + 4 digits + 1 letter (e.g. ABCDE1234F).
+    - Aadhaar: 12-digit unique ID issued by UIDAI. Mandatory to link with PAN
+      for ITR filing; ITR-1 is rejected if PAN-Aadhaar link is missing.
+
+11. ITR-1 (Sahaj) Eligibility:
+    ITR-1 is the simplest form, available only to resident individuals with:
+    - Total income up to Rs 50 lakh
+    - Income from salary / pension, one house property, other sources
+      (interest, family pension), and agricultural income up to Rs 5,000
+    NOT eligible if you have capital gains, business income, multiple house
+    properties, foreign income/assets, or are a director in a company.
+
+12. HRA (House Rent Allowance) Exemption - Old Regime Only:
+    Salaried employees in rented accommodation claim HRA exemption under
+    Section 10(13A). The exemption is the MINIMUM of three values:
+    - Actual HRA received from employer
+    - 50% of basic salary (metro cities: Delhi, Mumbai, Kolkata, Chennai)
+      OR 40% of basic salary (all non-metro cities)
+    - Actual rent paid minus 10% of basic salary
+    HRA exemption is NOT available under the new regime.
+    Mandatory: rent receipts; landlord PAN required if annual rent > Rs 1,00,000.
+    If employee owns a house in the same city, HRA exemption is disallowed.
+
+13. Income from House Property (Allowed in ITR-1 - One Property Only):
+    ITR-1 permits income from one self-occupied OR one let-out property.
+    Self-Occupied Property:
+    - Annual value treated as NIL.
+    - Home loan interest deductible up to Rs 2,00,000 under Section 24(b)
+      in OLD regime. Under new regime this deduction is NOT available.
+    Let-Out Property:
+    - Gross annual rent is taxable income under "House Property".
+    - Standard deduction of 30% of net annual value allowed for repairs.
+    - Full home loan interest deductible (no upper cap) under Section 24(b).
+    NOT eligible for ITR-1: two or more house properties (must use ITR-2).
+
+14. Savings Bank Interest and Section 80TTA / 80TTB - Old Regime Only:
+    Interest earned on savings bank accounts, FDs, and RDs is taxable as
+    "Income from Other Sources". Deductions available in OLD regime:
+    - Section 80TTA: Deduction up to Rs 10,000 on savings bank interest only.
+      Available to individuals and HUFs below age 60.
+    - Section 80TTB: Deduction up to Rs 50,000 on ALL interest income
+      (savings bank + fixed deposits + recurring deposits).
+      Available ONLY to SENIOR CITIZENS (age 60 and above).
+    FD interest is NOT covered by 80TTA; it is fully taxable for non-seniors.
+    80TTA and 80TTB are NOT available under the new regime.
+
+15. Regime Comparison - When to Choose Old vs New (FY 2024-25):
+    The new regime is the DEFAULT for FY 2024-25; opt-out explicitly for old.
+    New regime advantages:
+    - Lower slab rates; standard deduction Rs 75,000 (vs Rs 50,000 old).
+    - Tax-free up to Rs 7,00,000 income due to 87A rebate (Rs 25,000).
+    - Simpler; no need to maintain investment proofs.
+    Old regime is beneficial when total deductions exceed roughly Rs 3,75,000:
+    - 80C up to Rs 1,50,000 (PPF, ELSS, LIC, EPF, etc.)
+    - 80D up to Rs 25,000 - Rs 1,00,000 (health insurance)
+    - HRA exemption (varies by salary and rent)
+    - Home loan interest up to Rs 2,00,000 under 24(b)
+    - 80TTA/80TTB (savings / FD interest deduction)
+    Break-even rule of thumb: if total deductions > Rs 3,75,000, old regime
+    saves more tax for incomes above Rs 10 lakh. Below Rs 7 lakh, new regime
+    is almost always better because of the Rs 25,000 full rebate under 87A.
+
+16. ITR-1 Filing Deadline and Late Filing Penalty (AY 2025-26):
+    Original due date: July 31, 2025 (for FY 2024-25 / AY 2025-26).
+    Belated return: Filed after July 31 but before December 31, 2025.
+    Late filing fee under Section 234F:
+    - Rs 1,000 if total income is up to Rs 5,00,000.
+    - Rs 5,000 if total income exceeds Rs 5,00,000.
+    Interest under Section 234A: 1% per month on unpaid tax from due date.
+    Revised return: Allowed until December 31, 2025 to correct mistakes.
+    e-Verification: Mandatory within 30 days of filing using Aadhaar OTP,
+    net banking, DEMAT account, or send signed ITR-V to CPC Bengaluru.
+    Unverified returns are treated as NOT filed.
+
+17. Advance Tax (Applicable when Tax Due > Rs 10,000):
+    If total tax liability minus TDS exceeds Rs 10,000, advance tax is mandatory.
+    Installment schedule (percentage of total annual tax liability):
+    - 15% by June 15
+    - 45% by September 15
+    - 75% by December 15
+    - 100% by March 15
+    Salaried employees whose employer deducts 100% TDS are usually exempt.
+    Interest under Section 234B: 1% per month if advance tax < 90% of liability.
+    Interest under Section 234C: 1% per month on shortfall at each installment.
+    Advance tax is the same for both old and new regime.
+
+18. Section 80CCD(1B) - National Pension System (NPS) Additional Deduction:
+    Additional deduction up to Rs 50,000 for own contributions to an NPS Tier-1 account.
+    This is OVER AND ABOVE the Rs 1,50,000 ceiling of Section 80C, so the total
+    deduction possible in old regime: 80C (Rs 1.5L) + 80CCD(1B) (Rs 50K) = Rs 2,00,000.
+    Available to salaried employees, self-employed, and government employees.
+    80CCD(1B) is OLD regime only. NOT available under the new regime.
+
+    Section 80CCD(2) is different - it covers EMPLOYER contribution to NPS:
+    - Up to 10% of (basic salary + DA) for private-sector employees
+    - Up to 14% of (basic salary + DA) for central/state government employees
+    80CCD(2) is the ONLY Chapter VI-A deduction available under the new regime.
+
+19. Section 80G - Donations to Charitable Organizations (Old Regime Only):
+    Deduction for donations to specified institutions, funds, and trusts.
+    Categories of donations:
+    - 100% deduction without limit: PM National Relief Fund, National Defence Fund,
+      PM CARES Fund, Swachh Bharat Kosh, Clean Ganga Fund.
+    - 100% deduction subject to 10% of Adjusted Gross Total Income cap.
+    - 50% deduction without limit: Indira Gandhi Memorial Trust, Rajiv Gandhi Foundation.
+    - 50% deduction subject to 10% of AGTI cap: most charitable trusts under Section 12A.
+    Cash donations exceeding Rs 2,000 are NOT deductible. Use bank transfer, cheque, or UPI.
+    Donor must obtain a stamped receipt with the institution's PAN and 80G registration number.
+    80G is NOT available under the new regime.
+
+20. Leave Travel Allowance (LTA) - Section 10(5) Exemption (Old Regime Only):
+    Exemption for actual travel cost incurred for self and family on leave within India.
+    Coverage limited to: actual fare for the shortest route. NOT covered: hotel, food,
+    local conveyance, or any non-travel expenses.
+    Frequency: TWO journeys allowed in a block of FOUR calendar years.
+    Current block: 2022-2025 (calendar years). Previous block: 2018-2021.
+    Mode-wise limits:
+    - Air travel: economy class fare on a national carrier (e.g. Air India)
+    - Rail: AC First Class fare for the shortest route
+    - Road (where rail is not connected): equivalent first class / deluxe bus fare
+    Travel must be within INDIA only. International travel is NOT covered.
+    Family = spouse, children, dependent parents, dependent siblings.
+    LTA exemption is NOT available under the new regime.
+
+21. Professional Tax - Section 16(iii) (Old Regime Only):
+    Professional tax is levied by state governments on salaried individuals.
+    Maximum Rs 2,500 per year (varies by state - common in Maharashtra, Karnataka,
+    West Bengal, Tamil Nadu; not levied in Delhi, Haryana, Uttar Pradesh).
+    Employer deducts it monthly and pays to the state government.
+    Appears as a deduction line in Form 16 Part B.
+    Under OLD regime: deductible from gross salary under Section 16(iii).
+    Under NEW regime: Section 115BAC allows ONLY Section 16(ia) standard deduction.
+    Section 16(ii) entertainment allowance and 16(iii) professional tax are NOT
+    deductible in the new regime.
+
+22. Gratuity and Leave Encashment Exemptions - Section 10(10) and 10(10AA):
+    Available in BOTH old and new regimes (these are exemptions from income, not
+    Chapter VI-A deductions).
+
+    Gratuity (Section 10(10)):
+    - Government employees: fully exempt without any limit.
+    - Private sector covered by Payment of Gratuity Act 1972: exempt up to LEAST of:
+      a) Actual gratuity received
+      b) Rs 20,00,000 (lifetime cap across all employers)
+      c) (Last drawn salary x 15/26) x years of completed service
+    - Private sector NOT covered by the Act: exempt up to LEAST of:
+      a) Actual gratuity received
+      b) Rs 20,00,000
+      c) (Average 10-month salary x 1/2) x years of completed service
+
+    Leave Encashment (Section 10(10AA)):
+    - Government employees: fully exempt without limit.
+    - Private sector employees on retirement / resignation: exempt up to LEAST of:
+      a) Actual leave encashment received
+      b) Rs 25,00,000 (raised from Rs 3,00,000 in May 2023, applies FY 2023-24 onwards)
+      c) Average 10-month salary
+      d) Cash equivalent of unutilised earned leave (max 30 days per year of service)
+
+    Excess above the exemption limit is taxable under "Income from Salary".
+
+23. Senior Citizen and Super Senior Citizen Slabs (Old Regime Only):
+    The OLD regime has age-based basic exemption thresholds:
+    - Below 60 years: Rs 2,50,000 nil slab
+    - Senior Citizen (age 60-79): Rs 3,00,000 nil slab
+    - Super Senior Citizen (age 80+): Rs 5,00,000 nil slab
+    Age determined as of last day of the financial year (March 31, 2025 for FY 2024-25).
+
+    The NEW regime has the SAME slab structure for all ages:
+    - Up to Rs 3,00,000: Nil (slab applies regardless of age)
+    Age-based benefits do NOT apply in the new regime. Senior citizens choosing
+    the new regime do not get a higher nil slab.
+
+    Super senior citizens (80+) with no business income are also EXEMPT from advance
+    tax obligations under Section 207, regardless of regime.
+
+24. Section 87A Marginal Relief - Edge Case Around the Threshold:
+    The 87A rebate creates a tax cliff: just above the rebate threshold the tax
+    jumps sharply. Marginal relief smooths this discontinuity.
+
+    New Regime FY 2024-25 example:
+    - Total income exactly Rs 7,00,000: rebate Rs 25,000 -> total tax Rs 0
+    - Total income Rs 7,00,001: NO rebate -> slab tax Rs 25,000 + 4% cess = Rs 26,000
+    - Without marginal relief, Rs 1 of additional income would create Rs 26,000 of tax.
+
+    Marginal relief rule: tax payable shall not exceed the income above the threshold.
+    For total income Rs 7,00,001, tax payable is capped at Rs 1 (the excess above Rs 7L).
+
+    Marginal relief applies only up to the break-even point where slab tax naturally
+    equals the income excess (around total income Rs 7,27,777 in new regime FY 2024-25).
+    Above the break-even, normal slab tax applies and no marginal relief is given.
+
+    Old Regime: same principle applies around the Rs 5,00,000 / Rs 12,500 rebate threshold.
+
+25. Annual Information Statement (AIS) and Form 26AS:
+    Form 26AS - tax credit statement showing:
+    - All TDS deducted by employers, banks, tenants
+    - Advance tax and self-assessment tax paid
+    - Refunds issued in the year
+    - Specified high-value financial transactions
+    Available at: https://www.incometax.gov.in -> Services -> View Form 26AS
+
+    AIS - Annual Information Statement (introduced FY 2021-22, more comprehensive):
+    Shows ALL financial transactions reported to the Income Tax Department:
+    - Salary, interest, dividends from all sources
+    - Mutual fund and share transactions
+    - Property purchases and sales above thresholds
+    - Foreign remittances, large credit-card spends
+    Cross-reference AIS with Form 16 and bank statements before filing.
+    If AIS shows incorrect data, submit feedback through the AIS portal.
+    Pre-filled ITR-1 fetches data from 26AS and AIS automatically.
+
+26. New Regime - Complete List of Disallowed Deductions and Exemptions:
+    The following are NOT available under Section 115BAC (new regime, default for AY 2025-26):
+
+    Salary-side (Sections 10 and 16):
+    - HRA exemption (Section 10(13A))
+    - LTA exemption (Section 10(5))
+    - Children's education and hostel allowances
+    - Entertainment allowance (Section 16(ii))
+    - Professional tax (Section 16(iii))
+
+    Chapter VI-A deductions:
+    - 80C (PPF, ELSS, LIC, NSC, EPF, etc.)
+    - 80CCC and 80CCD(1) (own pension contributions)
+    - 80CCD(1B) (additional NPS Rs 50K)
+    - 80D (health insurance)
+    - 80E (education loan interest)
+    - 80G (donations)
+    - 80TTA / 80TTB (savings / FD interest)
+    - 80U (disability)
+    - All other Section 80 deductions
+
+    House Property:
+    - Section 24(b) interest deduction for self-occupied house: NOT available
+    - 30% standard deduction on let-out property: AVAILABLE (part of HP income computation)
+
+    What IS allowed under the new regime:
+    - Standard deduction Rs 75,000 (Section 16(ia))
+    - 80CCD(2) - employer's NPS contribution (10% private / 14% govt of basic+DA)
+    - 80JJAA - employment-generation deduction (only for businesses, not ITR-1)
+    - Family pension standard deduction Rs 25,000 (Section 57(iia))
+    - Rebate u/s 87A (Rs 25,000 if total income <= Rs 7L)
+    - Surcharge cap at 25% (vs 37% in old regime above Rs 5cr)
+
+27. ITR-1 Form Structure - Schedules and Parts:
+    The ITR-1 (Sahaj) form is organised into the following sections:
+
+    Part A - General Information:
+    - Name, PAN, Aadhaar, address, email, mobile
+    - Filing status (resident, individual or HUF)
+    - Employer category (government, PSU, private, pensioner)
+    - Tax regime selection (new is default; opt for old explicitly)
+    - Original or revised return; original date and acknowledgement if revised
+
+    Schedule S - Income from Salary:
+    - Gross salary as per Form 16
+    - Allowances exempt under Section 10 (HRA, LTA - only if old regime)
+    - Standard deduction (auto-filled Rs 75K new / Rs 50K old)
+    - Professional tax (only old regime)
+    - Net taxable salary
+
+    Schedule HP - Income from House Property (one property only):
+    - Address and ownership percentage
+    - Self-occupied vs let-out
+    - Annual value, municipal taxes, 30% standard deduction (let-out only)
+    - Interest on home loan under Section 24(b)
+
+    Schedule OS - Income from Other Sources:
+    - Savings bank interest
+    - Fixed deposit and recurring deposit interest
+    - Family pension (with applicable standard deduction)
+    - Other interest income
+
+    Schedule VI-A - Deductions (old regime only):
+    - 80C, 80D, 80G, 80CCD(1B), 80E, 80TTA / 80TTB, etc.
+
+    Part B-TI - Total Income computation
+    Part B-TTI - Tax on Total Income (slabs, rebate, surcharge, cess)
+    Schedule TDS - TDS from Form 16 and bank TDS (cross-checked with 26AS)
+    Schedule IT - Advance and self-assessment tax paid
+
+28. e-Verification Methods After Filing:
+    Filing is INCOMPLETE without e-verification. Unverified ITR is treated as not filed.
+    Time limit: 30 days from date of filing (reduced from 120 days in 2022).
+
+    Methods (in order of speed and convenience):
+    1. Aadhaar OTP - Aadhaar must be linked to PAN. OTP sent to Aadhaar-linked mobile.
+       Fastest method (under 2 minutes).
+    2. Net Banking - Login through bank's net banking portal -> Income Tax e-filing link.
+       Generates EVC (Electronic Verification Code). Most major banks supported.
+    3. DEMAT account - EVC via CDSL or NSDL pre-validated DEMAT account.
+    4. Bank ATM - EVC via select bank ATMs (SBI, Axis, Canara, ICICI, etc.).
+    5. Digital Signature Certificate (DSC) - mandatory for businesses, optional for ITR-1.
+    6. Offline (last resort) - Print signed ITR-V, post by ordinary or speed post to:
+       Centralized Processing Center, Income Tax Department, Bengaluru - 560500.
+       Must reach CPC within 30 days of filing date.
+
+    Bank account pre-validation is required to receive any refund. Link bank account at
+    the e-filing portal under Profile -> My Bank Account.
+    PAN-Aadhaar must be linked before filing or the ITR will be rejected.
+
+29. Budget 2024 Key Changes (FY 2024-25 / AY 2025-26):
+    Changes effective for ITR-1 filings under AY 2025-26:
+
+    New regime (default regime from AY 2024-25):
+    - Standard deduction RAISED from Rs 50,000 to Rs 75,000 for salaried and pensioners.
+    - Family pension standard deduction RAISED from Rs 15,000 to Rs 25,000 (Section 57).
+    - New regime tax slabs revised (see section 1).
+    - 87A rebate: Rs 25,000 if total income <= Rs 7,00,000 (unchanged from FY 2023-24).
+    - Surcharge in new regime continues to cap at 25% (no 37% slab even above Rs 5cr).
+
+    Old regime:
+    - Standard deduction unchanged at Rs 50,000.
+    - Slabs unchanged.
+    - 87A rebate: Rs 12,500 if total income <= Rs 5,00,000 (unchanged).
+    - Surcharge can reach 37% above Rs 5cr.
+
+    NPS:
+    - 80CCD(2) employer contribution limit RAISED from 10% to 14% of (basic + DA) for
+      central and state government employees. Private sector employer cap remains 10%.
+
+    Filing-side improvements:
+    - New regime is the DEFAULT. To choose old regime, the taxpayer must opt out
+      explicitly in the ITR-1 form (Part A, "Tax regime selection").
+    - Pre-filled ITR enhanced - more data auto-populated from AIS, 26AS, and Form 16.

@@ -41,6 +41,13 @@ class TaxFilingState(TypedDict):
     last_updated: Optional[datetime]
     current_agent: Optional[str]  # Which agent is currently executing
 
+    # Phase 0 additions - Indian tax filing
+    regime: Optional[str]                     # "old" | "new"
+    form16_id: Optional[int]                  # FK to Form16 row (Phase 2)
+    tax_breakdown: Optional[Dict[str, Any]]   # tax_engine_in.TaxBreakdown.to_dict()
+    itr1_filing_id: Optional[int]             # FK to ITR1Filing row
+    pdf_path: Optional[str]                   # Filesystem path to generated PDF
+
 
 class UserProfile(TypedDict):
     """Structured user data extracted by interviewer agent"""

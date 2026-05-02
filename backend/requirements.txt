@@ -4,9 +4,10 @@ uvicorn[standard]==0.27.0
 gunicorn==21.2.0
 
 # Database
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
-alembic==1.13.1
+sqlalchemy>=2.0.25
+psycopg2-binary>=2.9.9     # use >= to pick up Python 3.13/3.14 wheels
+psycopg[binary]>=3.3       # required by langgraph-checkpoint-postgres
+alembic>=1.13.1
 
 # Security & Authentication
 passlib[bcrypt]==1.7.4
@@ -19,22 +20,29 @@ python-dotenv==1.0.0
 pydantic-settings==2.1.0
 
 # AI & Agents
-pyautogen==0.2.10
+# pyautogen retired in Phase 0 (LangGraph is the sole agent system)
 openai==1.10.0
 anthropic==0.8.1
 
-# Vector Database & RAG
-chromadb==0.4.22
-sentence-transformers==2.3.1
-langchain==0.1.4
-langchain-community==0.0.17
+# Vector Database & RAG — pgvector via SQLAlchemy (chromadb removed)
+pgvector>=0.2.4
+sentence-transformers>=2.3.1
+langchain>=0.1.4
+langchain-core>=0.1.0
+langchain-community>=0.0.17
+langchain-openai>=1.0
+langchain-google-genai>=0.0.1
+langchain-ollama>=0.1.0
+langgraph>=1.0
+langgraph-checkpoint-postgres>=3.0
 
-# Data Processing
-pandas==2.1.4
-numpy==1.26.3
+# Data Processing (used by some legacy modules; 3.14 wheels need newer versions)
+pandas>=2.1.4
+numpy>=1.26.3
 
 # Validation & Serialization
-pydantic==2.5.3
+pydantic>=2.5.3
+email-validator>=2.0
 
 # HTTP Client
 httpx==0.26.0

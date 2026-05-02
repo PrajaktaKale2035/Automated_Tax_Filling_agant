@@ -10,7 +10,8 @@ let socket: WebSocket | null = null
 const connect = () => {
   // In production, use wss:// and proper host
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = 'localhost:8000' // Hardcoded for dev, should be env var
+  const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
+  const host = apiBase.replace(/^https?:\/\//, '')
   const clientId = Math.random().toString(36).substring(7)
   
   try {
