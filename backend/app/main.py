@@ -20,6 +20,21 @@ async def lifespan(app: FastAPI):
     print("Tax Filing System API starting up (Indian ITR-1 / FY2024-25)...")
     print("API documentation available at: http://localhost:8000/api/docs")
     print("Health check available at: http://localhost:8000/api/health")
+
+    # Pre-warm the SentenceTransformer + DB pool in a background thread so the
+    # first chat request doesn't pay the 5-10s cold-start cost.
+    import asyncio as _aio
+
+    async def _prewarm():
+        try:
+            from app.rag.retriever import get_retriever
+            await _aio.to_thread(lambda: get_retriever().retrieve("warmup", k=1))
+            print("[startup] RAG retriever warmed.")
+        except Exception as e:
+            print(f"[startup] RAG warmup skipped: {e}")
+
+    _aio.create_task(_prewarm())
+
     yield
     # Shutdown
     print("Tax Filing System API shutting down...")

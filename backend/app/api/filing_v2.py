@@ -281,14 +281,22 @@ def rag_search(q: str, k: int = 5, topic: Optional[str] = None):
     """
     if not q.strip():
         raise HTTPException(status_code=422, detail="query 'q' must not be empty")
-    from app.rag.retriever import TaxRetriever
-    retriever = TaxRetriever()
-    chunks = retriever.retrieve(q, k=k, topic_filter=topic)
+    from app.rag.retriever import get_langchain_retriever
+    retriever = get_langchain_retriever(k=k, topic_filter=topic)
+    docs = retriever.invoke(q)
     return {
         "query": q,
         "k": k,
         "topic_filter": topic,
-        "results": [c.to_dict() for c in chunks],
+        "results": [
+            {
+                "content": doc.page_content,
+                "source": doc.metadata.get("source", ""),
+                "topic": doc.metadata.get("topic"),
+                "score": round(doc.metadata.get("score", 0.0), 4),
+            }
+            for doc in docs
+        ],
     }
 
 
@@ -371,7 +379,19 @@ async def chat_start(req: ChatStartRequest):
     try:
         result = await tax_filing_graph.ainvoke(initial_state, config=config)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"graph execution failed: {e}")
+        msg = str(e)
+        if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+            raise HTTPException(status_code=429, detail=(
+                "Gemini free-tier daily quota exhausted on the current model. "
+                "Change GEMINI_MODEL in backend/.env to another model "
+                "(gemini-flash-lite-latest, gemini-2.5-flash-lite, gemini-flash-latest, "
+                "gemini-pro-latest, or a gemma-3-* id), then retry."
+            ))
+        if "UNAVAILABLE" in msg or "503" in msg:
+            raise HTTPException(status_code=503, detail=(
+                "Gemini model is temporarily overloaded by Google. Retry in ~30s."
+            ))
+        raise HTTPException(status_code=500, detail=f"graph execution failed: {msg}")
     return _serialize_result(thread_id, result)
 
 
@@ -396,5 +416,17 @@ async def chat_message(req: ChatMessageRequest):
     try:
         result = await tax_filing_graph.ainvoke(updated, config=config)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"graph execution failed: {e}")
+        msg = str(e)
+        if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+            raise HTTPException(status_code=429, detail=(
+                "Gemini free-tier daily quota exhausted on the current model. "
+                "Change GEMINI_MODEL in backend/.env to another model "
+                "(gemini-flash-lite-latest, gemini-2.5-flash-lite, gemini-flash-latest, "
+                "gemini-pro-latest, or a gemma-3-* id), then retry."
+            ))
+        if "UNAVAILABLE" in msg or "503" in msg:
+            raise HTTPException(status_code=503, detail=(
+                "Gemini model is temporarily overloaded by Google. Retry in ~30s."
+            ))
+        raise HTTPException(status_code=500, detail=f"graph execution failed: {msg}")
     return _serialize_result(req.thread_id, result)

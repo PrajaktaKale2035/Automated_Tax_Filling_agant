@@ -1,29 +1,95 @@
-Tax Rules for FY 2024-25 (AY 2025-26)
+Tax Rules for FY 2024-25 (AY 2025-26) - Indian Income Tax (ITR-1 / Sahaj)
 
-1. Income Tax Slabs (New Regime):
-   - Up to ₹3,00,000: Nil
-   - ₹3,00,001 to ₹7,00,000: 5%
-   - ₹7,00,001 to ₹10,00,000: 10%
-   - ₹10,00,001 to ₹12,00,000: 15%
-   - ₹12,00,001 to ₹15,00,000: 20%
-   - Above ₹15,00,000: 30%
+1. Income Tax Slabs (New Regime, default for FY 2024-25):
+   The new regime is the default tax regime for individuals filing ITR-1.
+   - Up to Rs 3,00,000: Nil
+   - Rs 3,00,001 to Rs 7,00,000: 5%
+   - Rs 7,00,001 to Rs 10,00,000: 10%
+   - Rs 10,00,001 to Rs 12,00,000: 15%
+   - Rs 12,00,001 to Rs 15,00,000: 20%
+   - Above Rs 15,00,000: 30%
 
-2. Standard Deduction:
-   - Standard deduction for salaried employees has been increased to ₹75,000 under the New Tax Regime.
+2. Income Tax Slabs (Old Regime, optional):
+   Taxpayers may opt out of the new regime and choose the old regime to claim
+   deductions like 80C / 80D / HRA / LTA. Old regime slabs are stiffer.
+   - Up to Rs 2,50,000: Nil
+   - Rs 2,50,001 to Rs 5,00,000: 5%
+   - Rs 5,00,001 to Rs 10,00,000: 20%
+   - Above Rs 10,00,000: 30%
 
-3. Section 80C (Old Regime Only):
-   - Deduction up to ₹1,50,000 for investments in PPF, EPF, LIC, ELSS, etc.
+3. Standard Deduction (Salaried & Pensioners):
+   - New Regime: Rs 75,000 (raised in Budget 2024 from Rs 50,000).
+   - Old Regime: Rs 50,000.
+   Applied automatically against gross salary; no proof needed.
 
-4. Section 80D (Old Regime Only):
-   - Deduction for health insurance premiums:
-     - Self & Family: Up to ₹25,000 (₹50,000 if senior citizen)
-     - Parents: Up to ₹25,000 (₹50,000 if senior citizen)
+4. Section 80C - Investments and Specified Payments (Old Regime Only):
+   Maximum deduction Rs 1,50,000 per financial year. Eligible instruments:
+   - Public Provident Fund (PPF)
+   - Employee Provident Fund (EPF)
+   - Equity Linked Savings Scheme (ELSS) mutual funds
+   - Life Insurance Premium (LIC)
+   - 5-year tax-saving fixed deposits
+   - National Savings Certificate (NSC)
+   - Sukanya Samriddhi Yojana
+   - Repayment of housing loan principal
+   - Children's tuition fees (up to two children)
+   80C is NOT available under the new regime.
 
-5. Rebate under Section 87A:
-   - New Regime: Tax rebate up to ₹25,000 for income up to ₹7,00,000.
-   - Old Regime: Tax rebate up to ₹12,500 for income up to ₹5,00,000.
+5. Section 80D - Health Insurance Premium (Old Regime Only):
+   Deduction for medical insurance premiums paid for self, family, and parents.
+   - Self, spouse, dependent children: up to Rs 25,000
+     (Rs 50,000 if any insured person is a senior citizen, age 60+)
+   - Parents: up to Rs 25,000 additional
+     (Rs 50,000 additional if parents are senior citizens, age 60+)
+   - Preventive health check-up: Rs 5,000 sub-limit within above caps.
+   80D is NOT available under the new regime.
 
-6. Surcharge:
-   - 10% for income above ₹50 Lakhs
-   - 15% for income above ₹1 Crore
-   - 25% for income above ₹2 Crores (New Regime capped at 25%)
+6. Section 87A Rebate:
+   A tax rebate that reduces tax liability to zero up to a threshold.
+   - New Regime (FY 2024-25): rebate of up to Rs 25,000 if total income is up
+     to Rs 7,00,000. Effectively makes income up to Rs 7L tax-free.
+   - Old Regime (FY 2024-25): rebate of up to Rs 12,500 if total income is up
+     to Rs 5,00,000. Effectively makes income up to Rs 5L tax-free.
+   Available to resident individuals only (not HUFs / non-residents).
+
+7. Surcharge on Income Tax:
+   Additional levy on the tax amount (NOT on income) for high-income earners.
+   - 10% surcharge: total income above Rs 50 lakh, up to Rs 1 crore
+   - 15% surcharge: total income above Rs 1 crore, up to Rs 2 crore
+   - 25% surcharge: total income above Rs 2 crore (new regime cap)
+   - 37% surcharge: applies only in the OLD regime above Rs 5 crore
+     (the new regime caps surcharge at 25%, no 37% slab).
+   Marginal relief is provided so that surcharge does not push net tax above
+   the slab boundary by more than the excess income.
+
+8. Health and Education Cess:
+   A flat 4% cess is levied on (basic income tax + surcharge), regardless of
+   regime, age, or income level. The cess funds national health and primary
+   education programs.
+   Formula: total tax payable = (slab tax - 87A rebate + surcharge) * 1.04
+   Example: if slab tax after rebate is Rs 1,00,000 and surcharge is Rs 0,
+   the cess is 4% of Rs 1,00,000 = Rs 4,000, total Rs 1,04,000.
+
+9. TDS (Tax Deducted at Source) and Form 16:
+   Form 16 is the salary TDS certificate issued by an employer at year-end.
+   It contains:
+   - Part A: TAN of employer, PAN of employee, quarterly TDS deposit details.
+   - Part B: gross salary, exemptions u/s 10, deductions u/s 16, taxable
+     income, slab tax, rebate, cess, total tax, TDS deducted.
+   When filing ITR-1, the TDS shown in Form 16 / Form 26AS is credited
+   against the computed tax liability. Excess TDS results in a refund;
+   shortfall results in tax due.
+
+10. PAN and Aadhaar Linkage:
+    - PAN (Permanent Account Number): 10-character alphanumeric ID, mandatory
+      for filing ITR. Format: 5 letters + 4 digits + 1 letter (e.g. ABCDE1234F).
+    - Aadhaar: 12-digit unique ID issued by UIDAI. Mandatory to link with PAN
+      for ITR filing; ITR-1 is rejected if PAN-Aadhaar link is missing.
+
+11. ITR-1 (Sahaj) Eligibility:
+    ITR-1 is the simplest form, available only to resident individuals with:
+    - Total income up to Rs 50 lakh
+    - Income from salary / pension, one house property, other sources
+      (interest, family pension), and agricultural income up to Rs 5,000
+    NOT eligible if you have capital gains, business income, multiple house
+    properties, foreign income/assets, or are a director in a company.

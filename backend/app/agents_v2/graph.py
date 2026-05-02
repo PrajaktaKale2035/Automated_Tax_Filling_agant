@@ -7,7 +7,18 @@ It orchestrates the 4 agent nodes in a cyclic, stateful manner.
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
 from .state import TaxFilingState
+import asyncio
 from .nodes import interviewer_node, researcher_node, calculator_node, auditor_node
+
+
+async def research_and_calc_node(state):
+    """Run researcher + calculator in parallel - they share state but
+    don't depend on each other's output."""
+    research_result, calc_result = await asyncio.gather(
+        researcher_node(state),
+        calculator_node(state),
+    )
+    return {**research_result, **calc_result, "current_agent": "research_and_calc"}
 import os
 
 
@@ -71,38 +82,32 @@ def create_tax_filing_graph():
     # Initialize the graph
     workflow = StateGraph(TaxFilingState)
     
-    # Add nodes
+    # Add nodes - research_and_calc fans out researcher+calculator in parallel
     workflow.add_node("interviewer", interviewer_node)
-    workflow.add_node("researcher", researcher_node)
-    workflow.add_node("calculator", calculator_node)
+    workflow.add_node("research_and_calc", research_and_calc_node)
     workflow.add_node("auditor", auditor_node)
-    
-    # Set entry point
+
     workflow.set_entry_point("interviewer")
-    
-    # Define edges
-    # Conditional: interviewer -> researcher (if data complete) OR stay in interviewer
+
+    # interviewer -> research_and_calc (if data complete) OR stay in interviewer
     workflow.add_conditional_edges(
         "interviewer",
         route_after_interviewer,
         {
-            "interviewer": "interviewer",  # Loop back if incomplete
-            "researcher": "researcher"
-        }
+            "interviewer": "interviewer",
+            "researcher": "research_and_calc",  # historical name kept in router
+        },
     )
-    
-    # Linear flow: researcher -> calculator -> auditor
-    workflow.add_edge("researcher", "calculator")
-    workflow.add_edge("calculator", "auditor")
-    
-    # Conditional: auditor -> END (if passed) OR -> researcher (if failed)
+
+    workflow.add_edge("research_and_calc", "auditor")
+
     workflow.add_conditional_edges(
         "auditor",
         should_continue_to_end,
         {
-            "researcher": "researcher",  # Cycle back to re-research
-            "end": END
-        }
+            "researcher": "research_and_calc",
+            "end": END,
+        },
     )
     
     # Phase 0: in-memory checkpointing.

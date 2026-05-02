@@ -24,29 +24,59 @@ _MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 _DEFAULT_DATA_FILE = Path(__file__).resolve().parents[2] / "tax_rules.txt"
 _DEFAULT_COLLECTION = "itr_rulebook"
 
-_TOPIC_KEYWORDS = {
-    "slab":               "slabs",
-    "regime":             "slabs",
-    "80c":                "80C",
-    "80d":                "80D",
-    "rebate":             "rebate-87a",
-    "87a":                "rebate-87a",
-    "surcharge":          "surcharge",
-    "cess":               "cess",
-    "tds":                "tds",
-    "standard deduction": "standard-deduction",
-    "form 16":            "form-16",
-    "pan":                "identity",
-    "aadhaar":            "identity",
-}
+# Two tiers. Specific terms always win over generic ones, regardless of count.
+# Within a tier, ties on count break by priority order.
+_SPECIFIC_KEYWORDS: list[tuple[str, str]] = [
+    ("cess",                 "cess"),
+    ("health and education", "cess"),
+    ("87a",                  "rebate-87a"),
+    ("rebate",               "rebate-87a"),
+    ("surcharge",            "surcharge"),
+    ("80c",                  "80C"),
+    ("80d",                  "80D"),
+    ("form 16",              "form-16"),
+    ("tds",                  "tds"),
+    ("standard deduction",   "standard-deduction"),
+    ("pan",                  "identity"),
+    ("aadhaar",              "identity"),
+    ("itr-1",                "itr1-eligibility"),
+    ("sahaj",                "itr1-eligibility"),
+]
+
+_GENERIC_KEYWORDS: list[tuple[str, str]] = [
+    ("slab",   "slabs"),
+    ("regime", "slabs"),
+]
+
+
+def _best_match(text: str, table: list[tuple[str, str]]) -> tuple[Optional[str], int]:
+    """Return (topic, count) for whichever keyword in `table` has the most
+    word-boundary occurrences in `text`. Ties broken by priority order."""
+    best_topic: Optional[str] = None
+    best_count = 0
+    best_priority = 1 << 30
+    for priority, (needle, topic) in enumerate(table):
+        pattern = r"\b" + re.escape(needle) + r"\b"
+        count = len(re.findall(pattern, text))
+        if count == 0:
+            continue
+        if count > best_count or (count == best_count and priority < best_priority):
+            best_count = count
+            best_priority = priority
+            best_topic = topic
+    return best_topic, best_count
 
 
 def _infer_topic(text: str) -> Optional[str]:
+    """Specific topic always wins over generic. Word-boundary match prevents
+    substring false positives ('cess' matching inside 'excess'). Used at
+    ingest time to populate `rag_documents.topic`."""
     lowered = text.lower()
-    for needle, topic in _TOPIC_KEYWORDS.items():
-        if needle in lowered:
-            return topic
-    return None
+    specific, _ = _best_match(lowered, _SPECIFIC_KEYWORDS)
+    if specific is not None:
+        return specific
+    generic, _ = _best_match(lowered, _GENERIC_KEYWORDS)
+    return generic
 
 
 def _chunk_paragraphs(text: str) -> list[str]:

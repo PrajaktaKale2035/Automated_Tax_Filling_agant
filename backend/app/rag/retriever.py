@@ -2,11 +2,26 @@
 
 Replaces the previous ChromaDB implementation. Cosine similarity is computed
 via pgvector's `<=>` operator on the `embedding` column.
+
+Exposes two retriever interfaces:
+  - TaxRetriever          : custom, returns RetrievedChunk dataclasses
+  - TaxLangChainRetriever : LangChain BaseRetriever, returns List[Document]
+
+Use get_langchain_retriever() for LangChain-compatible callers (nodes.py, LCEL chains).
+Use get_retriever() for legacy callers.
 """
 from __future__ import annotations
 
+import os
+# Force offline mode BEFORE importing sentence_transformers so it does not
+# HTTP-ping the Hugging Face Hub on every encode (was a hidden 8-10s/call
+# blocking call). load_dotenv has already run by the time this module loads,
+# but we set sane defaults here too.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
@@ -95,7 +110,96 @@ def retrieve_itr_rules(
     For high-frequency callers (e.g., LangGraph nodes), prefer instantiating a
     single `TaxRetriever` and reusing it to avoid repeated model loads.
     """
-    return TaxRetriever().retrieve(query, k=k, topic_filter=topic_filter)
+    return get_retriever().retrieve(query, k=k, topic_filter=topic_filter)
+
+
+# ----------------------------------------------------------------------------
+# Process-wide singleton. Loading SentenceTransformer costs 5-10s; never do it
+# per-request. The first call lazy-initializes; subsequent calls reuse.
+# ----------------------------------------------------------------------------
+_singleton: Optional["TaxRetriever"] = None
+
+
+def get_retriever() -> "TaxRetriever":
+    global _singleton
+    if _singleton is None:
+        _singleton = TaxRetriever()
+    return _singleton
+
+
+# ============================================================================
+# LangChain BaseRetriever wrapper
+# ============================================================================
+
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
+from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
+from pydantic import PrivateAttr
+
+
+class TaxLangChainRetriever(BaseRetriever):
+    """LangChain BaseRetriever backed by the pgvector TaxRetriever.
+
+    Returns LangChain Document objects so this retriever can be used directly
+    in LCEL chains, LangGraph nodes, and any other LangChain-compatible code.
+
+    topic_filter and k are set per-instance; the underlying SentenceTransformer
+    is shared via the process-wide TaxRetriever singleton.
+    """
+
+    k: int = 6
+    topic_filter: Optional[str] = None
+    _inner: TaxRetriever = PrivateAttr()
+
+    def __init__(self, *, inner: Optional[TaxRetriever] = None, **kwargs: Any):
+        super().__init__(**kwargs)
+        self._inner = inner if inner is not None else TaxRetriever()
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+    ) -> list[Document]:
+        chunks = self._inner.retrieve(query, k=self.k, topic_filter=self.topic_filter)
+        return [
+            Document(
+                page_content=c.content,
+                metadata={"source": c.source, "topic": c.topic, "score": c.score},
+            )
+            for c in chunks
+        ]
+
+    async def _aget_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: Any,
+    ) -> list[Document]:
+        import asyncio as _aio
+        chunks = await _aio.to_thread(
+            self._inner.retrieve, query, k=self.k, topic_filter=self.topic_filter
+        )
+        return [
+            Document(
+                page_content=c.content,
+                metadata={"source": c.source, "topic": c.topic, "score": c.score},
+            )
+            for c in chunks
+        ]
+
+
+def get_langchain_retriever(
+    *,
+    k: int = 6,
+    topic_filter: Optional[str] = None,
+) -> TaxLangChainRetriever:
+    """Return a LangChain BaseRetriever backed by the process-wide TaxRetriever.
+
+    Creates a lightweight wrapper each call; the expensive SentenceTransformer
+    model is loaded once and shared via get_retriever().
+    """
+    return TaxLangChainRetriever(inner=get_retriever(), k=k, topic_filter=topic_filter)
 
 
 if __name__ == "__main__":
@@ -107,7 +211,14 @@ if __name__ == "__main__":
     r = TaxRetriever()
     for q in ["What is the standard deduction in new regime?",
               "Section 80C limit",
-              "Surcharge for 1 crore income"]:
+              "Surcharge for 1 crore income",
+              "What is Health and Education Cess?"]:
         print(f"\n>> {q}")
         for c in r.retrieve(q, k=3):
             print(f"  [{c.score:.3f}] {c.topic or '-':<18} {c.content[:80]}")
+
+    print("\n--- LangChain retriever ---")
+    lc = get_langchain_retriever(k=3)
+    docs = lc.invoke("Section 87A rebate limit")
+    for d in docs:
+        print(f"  [{d.metadata['score']:.3f}] {d.metadata.get('topic') or '-':<18} {d.page_content[:80]}")
