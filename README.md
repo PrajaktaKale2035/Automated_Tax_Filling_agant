@@ -276,8 +276,9 @@ Full schema: `http://localhost:8000/api/docs`.
 - [`docs/MIGRATION_NOTES.md`](docs/MIGRATION_NOTES.md) — what changed (US → India)
 
 ### Guides
-- [`docs/guides/LANGCHAIN_INTEGRATION.md`](docs/guides/LANGCHAIN_INTEGRATION.md)
-- [`docs/guides/HOW_TO_SWITCH_PROVIDERS.md`](docs/guides/HOW_TO_SWITCH_PROVIDERS.md)
+- [`docs/guides/RAG_KNOWLEDGE_BASE.md`](docs/guides/RAG_KNOWLEDGE_BASE.md) — extending the ITR rulebook
+- [`docs/guides/UPDATING_FOR_NEW_FY.md`](docs/guides/UPDATING_FOR_NEW_FY.md) — what to change when slabs / Finance Act updates land
+- [`docs/api/AUTHENTICATION.md`](docs/api/AUTHENTICATION.md) — JWT login flow for API consumers
 
 ---
 

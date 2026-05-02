@@ -16,7 +16,7 @@
 ### What works end-to-end
 - Deterministic Indian tax engine (`backend/app/services/tax_engine_in.py`)
 - Indian ITR-1 schema in Postgres — 7 tables (see `app/models.py`)
-- **pgvector** RAG over the curated FY 2024-25 rulebook — 17 sections (~18 chunks)
+- **pgvector** RAG over the curated FY 2024-25 rulebook — 29 sections (~57 chunks)
 - LangGraph workflow: interviewer -> researcher -> calculator -> auditor (AutoGen retired)
 - Multi-provider LLM in `nodes.py`: Gemini / OpenAI / Ollama — switch via `LLM_PROVIDER` in `.env`
 - `interviewer_node` uses `await asyncio.wait_for(llm.ainvoke(), timeout=30)` — proper async, cancellable, with graceful error messages on quota/timeout/disconnect

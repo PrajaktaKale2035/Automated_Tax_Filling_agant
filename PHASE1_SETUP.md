@@ -92,7 +92,7 @@ python -m scripts.recreate_db --force
 
 # Ingest the curated FY 2024-25 ITR-1 rulebook into pgvector
 python -m app.rag.ingest
-# Expected: "Ingested 18 chunk(s) from 'tax_rules.txt' into 'itr_rulebook'."
+# Expected: "Ingested 57 chunk(s) from 'tax_rules.txt' into 'itr_rulebook'."
 
 # Verify what was ingested
 python -m app.rag.ingest --list

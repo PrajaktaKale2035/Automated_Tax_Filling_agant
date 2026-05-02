@@ -27,39 +27,65 @@ _DEFAULT_COLLECTION = "itr_rulebook"
 # Two tiers. Specific terms always win over generic ones, regardless of count.
 # Within a tier, ties on count break by priority order.
 _SPECIFIC_KEYWORDS: list[tuple[str, str]] = [
-    # Cess / rebate / surcharge
+    # Cess
     ("cess",                 "cess"),
     ("health and education", "cess"),
+    # Marginal relief — placed BEFORE 87a so dedicated marginal section wins
+    ("marginal relief",      "marginal-relief"),
+    # Rebate / surcharge
     ("87a",                  "rebate-87a"),
     ("rebate",               "rebate-87a"),
     ("surcharge",            "surcharge"),
-    # Deductions
+    # Chapter VI-A deductions
     ("80c",                  "80C"),
+    ("80ccd",                "80CCD"),
+    ("nps",                  "80CCD"),
+    ("national pension",     "80CCD"),
     ("80d",                  "80D"),
+    ("80g",                  "80G"),
+    ("donation",             "80G"),
     ("80tta",                "80TTA"),
     ("80ttb",                "80TTA"),
+    # Salary-side exemptions (Section 10 / Section 16)
+    ("lta",                  "lta"),
+    ("leave travel",         "lta"),
+    ("professional tax",     "professional-tax"),
+    ("gratuity",             "gratuity"),
+    ("leave encashment",     "gratuity"),
     # HRA / house property (before itr-1 so "house property" section wins)
     ("hra",                  "hra"),
     ("house rent",           "hra"),
     ("house property",       "house-property"),
     ("24b",                  "house-property"),
     ("self-occupied",        "house-property"),
-    # Regime comparison (before rebate so comparison chunk wins)
+    # Senior citizen slabs (after 80D so 80D senior-citizen mentions don't get hijacked)
+    ("super senior",         "senior-citizen"),
+    ("senior citizen",       "senior-citizen"),
+    # Regime comparison / new-regime exclusions
     ("break-even",           "regime-comparison"),
     ("when to choose",       "regime-comparison"),
-    # TDS / identity
+    ("115bac",               "new-regime-exclusions"),
+    ("disallowed",           "new-regime-exclusions"),
+    # TDS / Form 16 / AIS / identity
     ("form 16",              "form-16"),
     ("tds",                  "tds"),
     ("standard deduction",   "standard-deduction"),
+    ("26as",                 "ais-26as"),
+    ("annual information",   "ais-26as"),
     ("pan",                  "identity"),
     ("aadhaar",              "identity"),
-    # Deadline / advance tax
+    # Deadline / advance tax / e-verification
     ("234f",                 "deadline"),
     ("july 31",              "deadline"),
     ("belated",              "deadline"),
     ("advance tax",          "advance-tax"),
     ("234b",                 "advance-tax"),
     ("234c",                 "advance-tax"),
+    ("e-verification",       "e-verification"),
+    ("itr-v",                "e-verification"),
+    # Budget / Finance Act
+    ("budget 2024",          "budget-2024"),
+    ("finance act 2024",     "budget-2024"),
     # Eligibility (last so more-specific topics above win)
     ("itr-1",                "itr1-eligibility"),
     ("sahaj",                "itr1-eligibility"),
