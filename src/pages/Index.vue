@@ -63,7 +63,10 @@ const fetchDashboard = async () => {
   try {
     const userId = authStore.user?.id || 1 // Fallback to 1 for dev/testing if not logged in
     const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
-    const response = await fetch(`${apiBase}/api/sdui/dashboard/${userId}`)
+    const token = authStore.token
+    const response = await fetch(`${apiBase}/api/sdui/dashboard/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     if (!response.ok) {
       throw new Error('Failed to fetch dashboard configuration')
     }

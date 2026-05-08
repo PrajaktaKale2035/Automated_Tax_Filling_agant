@@ -1,0 +1,52 @@
+/* WCAG 2.1 AA accessibility overrides — applied when html.a11y-mode is present */
+
+html.a11y-mode,
+html.a11y-mode body {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  font-size: 20px !important;
+  line-height: 1.8 !important;
+}
+
+html.a11y-mode *:focus-visible {
+  outline: 3px solid #ff6600 !important;
+  outline-offset: 2px !important;
+}
+
+html.a11y-mode a,
+html.a11y-mode button,
+html.a11y-mode [role="button"] {
+  color: #ffff00 !important;
+  text-decoration: underline !important;
+}
+
+html.a11y-mode input,
+html.a11y-mode select,
+html.a11y-mode textarea {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+  font-size: 18px !important;
+}
+
+html.a11y-mode .bg-white,
+html.a11y-mode .bg-gray-50,
+html.a11y-mode .bg-gray-100 {
+  background-color: #111111 !important;
+  color: #ffffff !important;
+}
+
+/* Reduced motion */
+html.a11y-mode *,
+html.a11y-mode *::before,
+html.a11y-mode *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Screen reader: ensure hidden elements stay hidden */
+html.a11y-mode [aria-hidden="true"] {
+  display: none !important;
+}

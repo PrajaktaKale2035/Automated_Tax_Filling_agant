@@ -96,26 +96,58 @@ def _build_llm(temperature: float = 0.3):
 # Node 1: Interviewer - structured extraction from natural language
 # ----------------------------------------------------------------------------
 
-_INTERVIEWER_SYSTEM_PROMPT = """\
-You are a tax filing assistant for INDIAN ITR-1 (FY 2024-25 / AY 2025-26).
-Extract any of these fields the user has mentioned and return them as JSON:
-- income_salary (integer INR)
-- income_other (integer INR)
-- age (integer)
-- filing_status ("individual" or "huf")
-- regime ("old" or "new")
-- deductions_80c (integer INR; 80C is OLD regime only)
-- deductions_80d (integer INR; 80D is OLD regime only)
-- pan (string, e.g. ABCDE1234F)
+def build_interviewer_prompt(mode: str) -> str:
+    """Build a mode-adaptive system prompt for the interviewer node.
 
-Output format: a single JSON object on the LAST line of your reply, prefixed
-with `EXTRACTION:`. Above that line, reply conversationally - acknowledge what
-the user said and ask for any missing information needed to compute their tax.
-When answering tax rule questions, cite specific amounts from the rulebook context below.
+    Args:
+        mode: One of "novice", "intermediate", "expert", or "accessibility".
+              Defaults to "intermediate" behaviour for unknown values.
 
-Example final line:
-EXTRACTION: {"income_salary": 1200000, "regime": "old"}
-"""
+    Returns:
+        System prompt string tailored to the requested interaction mode.
+    """
+    base = (
+        "You are a tax filing assistant for INDIAN ITR-1 (FY 2024-25 / AY 2025-26). "
+        "Extract any of these fields the user has mentioned and return them as JSON: "
+        "income_salary (integer INR), income_other (integer INR), age (integer), "
+        "filing_status (\"individual\" or \"huf\"), regime (\"old\" or \"new\"), "
+        "deductions_80c (integer INR; 80C is OLD regime only), "
+        "deductions_80d (integer INR; 80D is OLD regime only), "
+        "pan (string, e.g. ABCDE1234F). "
+        "Only ask about Indian income: salary, house property, other sources. "
+        "Do not ask about US income, W-2, 1099, or IRS. "
+        "Output format: a single JSON object on the LAST line of your reply, prefixed "
+        "with `EXTRACTION:`. Above that line, reply conversationally - acknowledge what "
+        "the user said and ask for any missing information needed to compute their tax. "
+        "When answering tax rule questions, cite specific amounts from the rulebook context below. "
+        "Example final line: EXTRACTION: {\"income_salary\": 1200000, \"regime\": \"old\"}"
+    )
+    if mode == "novice":
+        return (
+            base + "\n\n"
+            "Use very simple language. Avoid jargon. "
+            "Explain terms like 'gross salary', 'TDS', 'deductions' in plain Hindi-English. "
+            "Ask one question at a time. Be encouraging and patient."
+        )
+    elif mode == "expert":
+        return (
+            base + "\n\n"
+            "Use precise ITR-1 field names (Schedule S, Schedule OS, 80C, 80D). "
+            "Be concise. Ask multiple related fields in one message if they are related. "
+            "Assume the user knows tax terminology."
+        )
+    elif mode == "accessibility":
+        return (
+            base + "\n\n"
+            "Use very short sentences. Avoid complex vocabulary. "
+            "One question per message. Confirm each answer before moving on."
+        )
+    else:  # intermediate (default)
+        return (
+            base + "\n\n"
+            "Balance clarity with completeness. "
+            "Briefly explain each field the first time you ask about it."
+        )
 
 
 def _build_interviewer_messages(state: "TaxFilingState", llm: Any) -> list:
@@ -141,7 +173,8 @@ def _build_interviewer_messages(state: "TaxFilingState", llm: Any) -> list:
     else:
         rag_block = ""
 
-    system_content = _INTERVIEWER_SYSTEM_PROMPT + rag_block
+    mode = state.get("preferred_mode") or "intermediate"
+    system_content = build_interviewer_prompt(mode) + rag_block
 
     model_name = (getattr(llm, "model", "") or "").lower()
     if "gemma" in model_name and history:

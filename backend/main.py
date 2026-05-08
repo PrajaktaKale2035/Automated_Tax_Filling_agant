@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import time
 
 from app.database import engine, Base
-from app.api import auth, users, tax_forms, sdui, ws, documents, filing
+from app.api import auth, users, sdui, ws, documents, filing_v2
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -27,11 +27,10 @@ app = FastAPI(
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-app.include_router(tax_forms.router, prefix="/api")
 app.include_router(sdui.router)
 app.include_router(ws.router)
 app.include_router(documents.router, prefix="/api")
-app.include_router(filing.router, prefix="/api")
+app.include_router(filing_v2.router, prefix="/api")
 
 # ============================================================================
 # CORS Middleware
@@ -40,12 +39,16 @@ app.include_router(filing.router, prefix="/api")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://localhost:3000",  # Alternative dev port
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "http://localhost:8082",
+        "http://localhost:8083",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080"
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8083",
     ],
     allow_credentials=True,
     allow_methods=["*"],

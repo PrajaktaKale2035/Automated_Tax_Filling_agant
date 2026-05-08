@@ -10,6 +10,8 @@ from typing import Literal
 from .tax_engine_in_constants import (
     NEW_REGIME_SLABS_FY_2024_25,
     OLD_REGIME_SLABS_FY_2024_25,
+    SENIOR_OLD_REGIME_SLABS_FY_2024_25,
+    SUPER_SENIOR_OLD_REGIME_SLABS_FY_2024_25,
     STANDARD_DEDUCTION_NEW_FY_2024_25,
     STANDARD_DEDUCTION_OLD_FY_2024_25,
     REBATE_87A_NEW_FY_2024_25,
@@ -30,20 +32,41 @@ def _check_fy(fy: str) -> None:
         raise ValueError(f"unsupported FY: {fy}")
 
 
-def _slabs_for(regime: Regime, fy: str):
+def _get_age_category(age: int) -> str:
+    """Classify taxpayer age per Indian IT Act definitions.
+
+    Returns "super_senior" (80+), "senior" (60-79), or "general" (<60).
+    """
+    if age >= 80:
+        return "super_senior"
+    if age >= 60:
+        return "senior"
+    return "general"
+
+
+def _slabs_for(regime: Regime, fy: str, age_category: str = "general"):
     _check_fy(fy)
     if regime == "new":
         return NEW_REGIME_SLABS_FY_2024_25
     if regime == "old":
+        if age_category == "super_senior":
+            return SUPER_SENIOR_OLD_REGIME_SLABS_FY_2024_25
+        if age_category == "senior":
+            return SENIOR_OLD_REGIME_SLABS_FY_2024_25
         return OLD_REGIME_SLABS_FY_2024_25
     raise ValueError(f"unknown regime: {regime}")
 
 
-def compute_slab_tax(taxable_income: int, regime: Regime, fy: str = "2024-25") -> int:
+def compute_slab_tax(
+    taxable_income: int,
+    regime: Regime,
+    fy: str = "2024-25",
+    age_category: str = "general",
+) -> int:
     """Apply slab rates to taxable income. Returns tax before rebate/surcharge/cess."""
     if taxable_income <= 0:
         return 0
-    slabs = _slabs_for(regime, fy)
+    slabs = _slabs_for(regime, fy, age_category=age_category)
     tax = 0.0
     for lower, upper, rate in slabs:
         band_top = upper if upper is not None else taxable_income
@@ -123,9 +146,33 @@ class TaxBreakdown:
     surcharge: int
     cess: int
     total_tax: int
+    age_category: str = "general"  # "general" | "senior" | "super_senior"
+    # Additional income sources (ITR-2, ITR-3, ITR-4)
+    capital_gains_stcg_equity: int = 0   # Section 111A: taxed at 15%
+    capital_gains_ltcg_equity: int = 0   # Section 112A: taxed at 10% above ₹1L
+    capital_gains_stcg_tax: int = 0
+    capital_gains_ltcg_tax: int = 0
+    house_property_income: int = 0        # net (after 30% std deduction + interest)
+    business_income: int = 0              # net profit for ITR-3; presumptive for ITR-4
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def compute_capital_gains_tax(
+    stcg_equity: int,
+    ltcg_equity: int,
+) -> tuple[int, int]:
+    """Compute special-rate capital gains tax.
+
+    Section 111A: STCG on equity/equity MFs @ 15%.
+    Section 112A: LTCG on equity/equity MFs @ 10% on gains above ₹1,00,000.
+    Returns (stcg_tax, ltcg_tax).
+    """
+    stcg_tax = int(round(max(0, stcg_equity) * 0.15))
+    ltcg_taxable = max(0, ltcg_equity - 100_000)
+    ltcg_tax = int(round(ltcg_taxable * 0.10))
+    return stcg_tax, ltcg_tax
 
 
 def compute_filing(
@@ -134,20 +181,37 @@ def compute_filing(
     regime: Regime,
     is_salary_income: bool = True,
     fy: str = "2024-25",
+    age: int = 30,
+    # Additional income sources (ITR-2 / ITR-3 / ITR-4)
+    capital_gains_stcg_equity: int = 0,
+    capital_gains_ltcg_equity: int = 0,
+    capital_gains_other: int = 0,
+    house_property_income: int = 0,
+    business_income: int = 0,
 ) -> TaxBreakdown:
-    """Top-level: compute the full tax breakdown for a single filer."""
-    taxable = apply_deductions(gross_income, deductions, regime, is_salary_income, fy)
-    slab_tax = compute_slab_tax(taxable, regime, fy)
+    """Top-level: compute the full tax breakdown for a single filer.
+
+    Args:
+        age: Taxpayer's age in years. Determines senior/super-senior slab selection
+             for the old regime. Defaults to 30 (general category).
+    """
+    age_category = _get_age_category(age)
+    # Regular income: salary + other CG (slab) + house property + business
+    regular_income = gross_income + capital_gains_other + house_property_income + business_income
+    taxable = apply_deductions(regular_income, deductions, regime, is_salary_income, fy)
+    slab_tax = compute_slab_tax(taxable, regime, fy, age_category=age_category)
     after_rebate = apply_rebate_87a(slab_tax, taxable, regime, fy)
     rebate_amount = slab_tax - after_rebate
     surcharge = compute_surcharge(after_rebate, taxable, regime, fy)
     cess = compute_cess(after_rebate, surcharge)
-    total = after_rebate + surcharge + cess
+    # Special-rate capital gains tax (not subject to 87A rebate or surcharge)
+    stcg_tax, ltcg_tax = compute_capital_gains_tax(capital_gains_stcg_equity, capital_gains_ltcg_equity)
+    total = after_rebate + surcharge + cess + stcg_tax + ltcg_tax
 
     return TaxBreakdown(
         regime=regime,
         fy=fy,
-        gross_income=int(gross_income),
+        gross_income=int(regular_income + capital_gains_stcg_equity + capital_gains_ltcg_equity),
         deductions_applied=dict(deductions),
         taxable_income=int(taxable),
         slab_tax=int(slab_tax),
@@ -156,4 +220,11 @@ def compute_filing(
         surcharge=int(surcharge),
         cess=int(cess),
         total_tax=int(total),
+        age_category=age_category,
+        capital_gains_stcg_equity=int(capital_gains_stcg_equity),
+        capital_gains_ltcg_equity=int(capital_gains_ltcg_equity),
+        capital_gains_stcg_tax=stcg_tax,
+        capital_gains_ltcg_tax=ltcg_tax,
+        house_property_income=int(house_property_income),
+        business_income=int(business_income),
     )

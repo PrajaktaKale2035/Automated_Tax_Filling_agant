@@ -212,7 +212,10 @@ const fetchPreview = async () => {
   try {
     const resp = await fetch(`${API_BASE}/api/v2/calc/preview`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}),
+      },
       body: JSON.stringify({
         gross_income: Number(formData.salary.gross || 0),
         deductions: {
@@ -271,7 +274,10 @@ const submitFiling = async () => {
   try {
     const resp = await fetch(`${API_BASE}/api/v2/filing/start`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}),
+      },
       body: JSON.stringify({
         user_id: authStore.user.id,
         regime: formData.regime,

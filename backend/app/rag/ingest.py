@@ -127,10 +127,27 @@ def _infer_topic(text: str) -> Optional[str]:
     return generic
 
 
+_SCRAPED_HEADER_RE = re.compile(
+    r"^\[SOURCE:\s*(?P<url>[^\]]+)\]\s*\[SCRAPED:\s*[^\]]+\]\s*\[FY:\s*[^\]]+\]\s*\n?",
+    re.MULTILINE,
+)
+
+
 def _chunk_paragraphs(text: str) -> list[str]:
     """Split by blank lines, keeping semantic paragraph boundaries."""
     chunks = re.split(r"\n\s*\n", text)
     return [c.strip() for c in chunks if c.strip()]
+
+
+def _strip_scraped_header(chunk: str) -> tuple[str, str | None]:
+    """Remove the [SOURCE:…][SCRAPED:…][FY:…] header line from a chunk.
+    Returns (cleaned_content, source_url | None)."""
+    m = _SCRAPED_HEADER_RE.match(chunk)
+    if m:
+        url = m.group("url").strip()
+        cleaned = chunk[m.end():].strip()
+        return cleaned, url
+    return chunk, None
 
 
 def ingest_text(
@@ -159,14 +176,18 @@ def ingest_text(
             db.commit()
 
         for idx, (chunk, vec) in enumerate(zip(chunks, embeddings)):
+            clean, scraped_url = _strip_scraped_header(chunk)
+            meta: dict = {"model": model_name, "char_len": len(clean)}
+            if scraped_url:
+                meta["source_url"] = scraped_url
             db.add(RagDocument(
                 collection=collection,
-                source=source,
+                source=scraped_url or source,
                 chunk_index=idx,
-                topic=_infer_topic(chunk),
-                content=chunk,
+                topic=_infer_topic(clean),
+                content=clean,
                 embedding=vec.tolist(),
-                extra_metadata={"model": model_name, "char_len": len(chunk)},
+                extra_metadata=meta,
             ))
         db.commit()
         return len(chunks)

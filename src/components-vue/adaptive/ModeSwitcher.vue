@@ -3,7 +3,7 @@
     <Label for="mode">Mode</Label>
     <Select v-model="selectedMode" placeholder="Select mode">
       <SelectItem value="novice">Novice (Guided)</SelectItem>
-      <SelectItem value="intermediate">Intermediate (Semi-Auto)</SelectItem>
+      <SelectItem value="intermediate">Intermediate</SelectItem>
       <SelectItem value="expert">Expert (Fully Auto)</SelectItem>
     </Select>
   </div>
@@ -22,10 +22,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const emit = defineEmits<{
-  change: [mode: Mode];
-}>();
+const emit = defineEmits<{ change: [mode: Mode] }>();
 
 const selectedMode = computed({
   get: () => props.mode,

@@ -159,7 +159,7 @@ const prefError = ref(false)
 
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${authStore.token}`,
+  ...(authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}),
 })
 
 const loadAll = async () => {
@@ -197,6 +197,11 @@ const loadAll = async () => {
 }
 
 const saveProfile = async () => {
+  if (!authStore.token) {
+    profileError.value = true
+    profileMessage.value = 'Please log in to save changes.'
+    return
+  }
   profileSaving.value = true
   profileError.value = false
   profileMessage.value = ''
@@ -220,6 +225,11 @@ const saveProfile = async () => {
 }
 
 const savePreferences = async () => {
+  if (!authStore.token) {
+    prefError.value = true
+    prefMessage.value = 'Please log in to save preferences.'
+    return
+  }
   prefSaving.value = true
   prefError.value = false
   prefMessage.value = ''

@@ -5,6 +5,7 @@ interface User {
     id: number
     email: string
     full_name: string
+    role?: 'filer' | 'helper' | 'read_only'
 }
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
@@ -48,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
                 id: me.id,
                 email: me.email,
                 full_name: me.full_name || '',
+                role: me.role ?? 'filer',
             }
             localStorage.setItem('user', JSON.stringify(user.value))
         }

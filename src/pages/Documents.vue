@@ -137,11 +137,13 @@ import CardContent from '@/components-vue/ui/CardContent.vue'
 import Button from '@/components-vue/ui/Button.vue'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { useAgentStore } from '@/stores/agentStore'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const agentStore = useAgentStore()
 
 interface DocCategory {
   id: string
@@ -232,6 +234,15 @@ const uploadOne = async (file: File) => {
     }
 
     if (data.extraction_status === 'extracted') {
+      // Persist Form 16 fields in agentStore so NewFiling.vue can prefill them.
+      const fields = data.extracted_fields ?? {}
+      agentStore.form16Data = {
+        gross_salary: fields.gross_salary ?? fields.grossSalary ?? undefined,
+        employer_name: fields.employer_name ?? fields.employerName ?? undefined,
+        tds_paid: fields.tds_deducted ?? fields.tds_paid ?? fields.tdsPaid ?? undefined,
+        pan: fields.pan ?? undefined,
+        fy: fields.fy ?? '2024-25',
+      }
       uploadStatus.value = `Form 16 detected & extracted (confidence ${(data.extraction_confidence * 100).toFixed(0)}%).`
     } else if (data.extraction_status === 'review_required') {
       uploadStatus.value = `Looks like a Form 16 but extraction confidence is low - manual review needed.`

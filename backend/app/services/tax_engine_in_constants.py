@@ -51,6 +51,21 @@ SURCHARGE_BANDS_NEW_FY_2024_25 = [
     (20_000_000, None,       0.25),
 ]
 
+# Old regime — age 60–79 (senior citizen)
+SENIOR_OLD_REGIME_SLABS_FY_2024_25: List[Slab] = [
+    (0,         300_000,  0.0),
+    (300_000,   500_000,  5.0),
+    (500_000,   1_000_000, 20.0),
+    (1_000_000, None,      30.0),
+]
+
+# Old regime — age 80+ (super senior citizen)
+SUPER_SENIOR_OLD_REGIME_SLABS_FY_2024_25: List[Slab] = [
+    (0,         500_000,  0.0),
+    (500_000,   1_000_000, 20.0),
+    (1_000_000, None,      30.0),
+]
+
 # Section 80C / 80D limits (old regime only).
 LIMIT_80C = 150_000
 LIMIT_80D_SELF_BELOW_60 = 25_000

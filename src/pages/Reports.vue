@@ -16,6 +16,10 @@
           </option>
         </select>
         <Button variant="outline" @click="refresh">Refresh</Button>
+        <Button variant="outline" @click="exportReport" :disabled="!filing">
+          <Download class="mr-2 h-4 w-4" />
+          Export Report
+        </Button>
         <Button variant="outline" @click="printReport" :disabled="!filing">
           <Printer class="mr-2 h-4 w-4" />
           Print
@@ -32,7 +36,7 @@
       <p class="text-muted-foreground mb-4">
         No ITR-1 filings found in the system. Reports here are populated from your real filings.
       </p>
-      <Button @click="$router.push('/filing/new')">Create your first filing</Button>
+      <Button @click="router.push('/filing/new')">Create your first filing</Button>
     </div>
 
     <!-- Real report content -->
@@ -123,6 +127,68 @@
         </Card>
       </div>
 
+      <!-- XAI Explanation Panel -->
+      <Card class="print:hidden">
+        <CardHeader>
+          <div class="flex items-center justify-between">
+            <CardTitle>Tax Explanation (AI)</CardTitle>
+            <div class="flex gap-2">
+              <button
+                @click="xaiTab = 'breakdown'"
+                :class="['text-xs px-3 py-1 rounded-full transition-colors', xaiTab === 'breakdown' ? 'bg-primary text-white' : 'bg-muted hover:bg-muted/80']"
+              >Breakdown</button>
+              <button
+                @click="fetchRegimeCompare(); xaiTab = 'compare'"
+                :class="['text-xs px-3 py-1 rounded-full transition-colors', xaiTab === 'compare' ? 'bg-primary text-white' : 'bg-muted hover:bg-muted/80']"
+              >Compare Regimes</button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div v-if="xaiLoading" class="text-sm text-muted-foreground py-2">Loading explanation…</div>
+          <div v-else-if="xaiTab === 'breakdown' && xaiResult">
+            <p class="text-sm text-muted-foreground mb-3">{{ xaiResult.summary }}</p>
+            <div v-for="line in xaiResult.lines" :key="line.label" class="border-b last:border-0">
+              <button
+                class="w-full flex justify-between items-center py-2 text-left hover:bg-muted/40 transition-colors px-1 rounded"
+                @click="xaiExpanded = xaiExpanded === line.label ? null : line.label"
+              >
+                <span class="text-sm font-medium">{{ line.label }}</span>
+                <span class="text-sm tabular-nums">{{ line.value < 0 ? '−' : '' }}₹{{ Math.abs(line.value).toLocaleString('en-IN') }}</span>
+              </button>
+              <div v-if="xaiExpanded === line.label" class="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 rounded p-2 mb-1">
+                {{ line.explanation }}
+              </div>
+            </div>
+            <!-- What-if 80C -->
+            <div class="mt-4 pt-3 border-t">
+              <p class="text-sm font-medium mb-2">What if you invest in 80C?</p>
+              <div class="flex gap-2">
+                <input
+                  v-model.number="whatif80c"
+                  type="number"
+                  placeholder="Amount (max ₹1,50,000)"
+                  class="border rounded px-2 py-1 text-sm flex-1 bg-background"
+                  :max="150000"
+                  @change="fetchWhatIf"
+                />
+              </div>
+              <div v-if="whatifResult" class="mt-2 text-xs text-green-700 bg-green-50 rounded p-2">
+                {{ whatifResult.explanation }}
+              </div>
+            </div>
+          </div>
+          <div v-else-if="xaiTab === 'compare' && regimeCompare" class="space-y-2 text-sm">
+            <div class="flex justify-between py-1"><span>Old Regime Tax</span><span class="font-medium">₹{{ regimeCompare.old.tax_payable.toLocaleString('en-IN') }}</span></div>
+            <div class="flex justify-between py-1"><span>New Regime Tax</span><span class="font-medium">₹{{ regimeCompare.new.tax_payable.toLocaleString('en-IN') }}</span></div>
+            <div class="mt-2 p-3 bg-green-50 dark:bg-green-950/20 rounded text-xs text-green-800 dark:text-green-300">
+              <strong>Recommended: {{ regimeCompare.recommendation }} regime</strong><br/>{{ regimeCompare.recommendation_reason }}
+            </div>
+          </div>
+          <div v-else class="text-sm text-muted-foreground">Select a filing to see AI explanation.</div>
+        </CardContent>
+      </Card>
+
       <Card class="border-primary/20 bg-primary/5 print:hidden">
         <CardHeader>
           <CardTitle class="text-sm">Filing Metadata</CardTitle>
@@ -140,7 +206,8 @@
 
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
-import { Printer } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Printer, Download } from 'lucide-vue-next'
 import BackButton from '@/components-vue/navigation/BackButton.vue'
 import Button from '@/components-vue/ui/Button.vue'
 import Card from '@/components-vue/ui/Card.vue'
@@ -151,6 +218,7 @@ import { useAuthStore } from '@/stores/authStore'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
 const authStore = useAuthStore()
+const router = useRouter()
 
 interface ITR1Filing {
   id: number
@@ -175,6 +243,15 @@ const loading = ref(true)
 const loadError = ref('')
 const json = ref<any>(null)
 
+// XAI state
+const xaiResult = ref<any>(null)
+const xaiLoading = ref(false)
+const xaiExpanded = ref<string | null>(null)
+const xaiTab = ref<'breakdown' | 'compare'>('breakdown')
+const whatif80c = ref<number | null>(null)
+const whatifResult = ref<any>(null)
+const regimeCompare = ref<any>(null)
+
 const filing = computed<ITR1Filing | null>(() =>
   filings.value.find(f => f.id === selectedFilingId.value) || null,
 )
@@ -182,6 +259,10 @@ const filing = computed<ITR1Filing | null>(() =>
 const standardDeduction = computed(() => {
   if (!filing.value) return 0
   return filing.value.regime === 'new' ? 75_000 : 50_000
+})
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${authStore.token}`,
 })
 
 const refresh = async () => {
@@ -192,7 +273,7 @@ const refresh = async () => {
     const url = userId
       ? `${API_BASE}/api/v2/filings?user_id=${userId}`
       : `${API_BASE}/api/v2/filings`
-    const resp = await fetch(url)
+    const resp = await fetch(url, { headers: authHeaders() })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     filings.value = await resp.json()
     if (filings.value.length && !selectedFilingId.value) {
@@ -208,14 +289,102 @@ const refresh = async () => {
 const fetchJson = async (id: number) => {
   json.value = null
   try {
-    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`)
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`, { headers: authHeaders() })
     if (resp.ok) json.value = await resp.json()
   } catch {
     /* swallow - cards still render summary fields */
   }
 }
 
-watch(selectedFilingId, (id) => { if (id) fetchJson(id) })
+// Derive FY from assessment year string (e.g. "2025-26" → "2024-25")
+const toFy = (ay: string): string => {
+  const m = ay.match(/^(\d{4})-\d{2}$/)
+  if (!m) return '2024-25'
+  const startYear = Number(m[1]) - 1
+  return `${startYear}-${String(startYear + 1).slice(-2)}`
+}
+
+const fetchXai = async (f: ITR1Filing) => {
+  xaiResult.value = null
+  xaiLoading.value = true
+  try {
+    const resp = await fetch(`${API_BASE}/api/v2/explain/`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gross_income: f.gross_income,
+        deductions: {},
+        regime: f.regime,
+        fy: toFy(f.assessment_year || '2025-26'),
+      }),
+    })
+    if (resp.ok) xaiResult.value = await resp.json()
+  } catch { /* swallow */ } finally { xaiLoading.value = false }
+}
+
+const exportReport = () => {
+  if (!filing.value) return
+  const data = {
+    filing_id: filing.value.id,
+    assessment_year: filing.value.assessment_year,
+    regime: filing.value.regime,
+    status: filing.value.status,
+    gross_income: filing.value.gross_income,
+    taxable_income: filing.value.taxable_income,
+    total_tax: filing.value.total_tax,
+    tds_paid: filing.value.tds_paid,
+    tax_due: filing.value.tax_due,
+    refund_due: filing.value.refund_due,
+    standard_deduction: standardDeduction.value,
+    itr1_json: json.value ?? null,
+    xai_explanation: xaiResult.value ?? null,
+    regime_compare: regimeCompare.value ?? null,
+    exported_at: new Date().toISOString(),
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `TaxReport-AY${filing.value.assessment_year}-filing${filing.value.id}.json`
+  document.body.appendChild(a)
+  a.click()
+  window.URL.revokeObjectURL(url)
+  document.body.removeChild(a)
+}
+
+const fetchWhatIf = async () => {
+  if (!filing.value || !whatif80c.value) return
+  try {
+    const resp = await fetch(`${API_BASE}/api/v2/explain/whatif`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gross_income: filing.value.gross_income, deductions: {}, regime: filing.value.regime, whatif_deductions_80c: whatif80c.value }),
+    })
+    if (resp.ok) whatifResult.value = await resp.json()
+  } catch { /* swallow */ }
+}
+
+const fetchRegimeCompare = async () => {
+  if (!filing.value || regimeCompare.value) return
+  try {
+    const resp = await fetch(`${API_BASE}/api/v2/explain/regime-compare`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gross_income: filing.value.gross_income, deductions: {}, regime: filing.value.regime }),
+    })
+    if (resp.ok) regimeCompare.value = await resp.json()
+  } catch { /* swallow */ }
+}
+
+watch(selectedFilingId, (id) => {
+  if (id) {
+    fetchJson(id)
+    const f = filings.value.find(x => x.id === id)
+    if (f) fetchXai(f)
+    regimeCompare.value = null
+    whatifResult.value = null
+  }
+})
 
 const printReport = () => window.print()
 

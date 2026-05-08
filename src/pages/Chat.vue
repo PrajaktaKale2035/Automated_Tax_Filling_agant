@@ -3,8 +3,8 @@
     <div class="max-w-7xl mx-auto h-[calc(100vh-8rem)]">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
         <!-- Chat -->
-        <div class="lg:col-span-2 flex flex-col h-full">
-          <div class="flex justify-between items-center mb-4">
+        <div class="lg:col-span-2 flex flex-col h-full overflow-hidden min-h-0">
+          <div class="flex justify-between items-center mb-4 flex-shrink-0">
             <div class="space-y-1">
               <h1 class="text-2xl font-bold">Tax Assistant (LangGraph + pgvector RAG)</h1>
               <p class="text-muted-foreground text-sm">
@@ -18,7 +18,7 @@
             </Button>
           </div>
 
-          <Card class="flex-1 flex flex-col overflow-hidden">
+          <Card class="flex-1 flex flex-col overflow-hidden min-h-0">
             <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
 
               <div v-if="messages.length === 0" class="text-center py-12">
@@ -30,8 +30,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
                   <button
                     v-for="suggestion in suggestions" :key="suggestion"
-                    @click="sendMessage(suggestion)"
-                    class="p-3 text-left rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors text-sm"
+                    @click="() => { trackChatBehavior('help_click', 1.0); sendMessage(suggestion) }"
+                    :disabled="isReadOnly"
+                    class="p-3 text-left rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {{ suggestion }}
                   </button>
@@ -86,15 +87,22 @@
               </div>
             </div>
 
-            <div class="border-t p-4">
+            <div class="border-t p-4 space-y-3 flex-shrink-0">
+              <!-- Read-only role notice -->
+              <div
+                v-if="isReadOnly"
+                class="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800"
+              >
+                You have read-only access. You can view the conversation but cannot send messages.
+              </div>
               <form @submit.prevent="handleSubmit" class="flex gap-3">
                 <Input
                   v-model="inputMessage"
                   placeholder="Ask about ITR-1, regime choice, deductions..."
                   class="flex-1"
-                  :disabled="isTyping"
+                  :disabled="isTyping || isReadOnly"
                 />
-                <Button type="submit" :disabled="!inputMessage.trim() || isTyping">
+                <Button type="submit" :disabled="!inputMessage.trim() || isTyping || isReadOnly">
                   <Send class="h-4 w-4" />
                 </Button>
               </form>
@@ -176,11 +184,18 @@ import Button from '@/components-vue/ui/Button.vue'
 import Input from '@/components-vue/ui/Input.vue'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { useAgentStore } from '@/stores/agentStore'
+import { useUiStore } from '@/stores/uiStore'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const agentStore = useAgentStore()
+const uiStore = useUiStore()
+
+/** True when the current user has read_only role (cannot send messages). */
+const isReadOnly = computed(() => authStore.user?.role === 'read_only')
 
 interface Message { role: 'user' | 'assistant'; content: string }
 interface ResearchResult { section: string; description: string; source: string; score: number }
@@ -211,10 +226,65 @@ const scrollToBottom = () => {
   })
 }
 
+/**
+ * Typed WebSocket message handler.
+ * Handles { type: "message"|"rag_sources"|"error" } frames from the backend.
+ * Also accepts plain-text (non-JSON) as a chat reply fallback.
+ */
+function handleWsMessage(event: MessageEvent) {
+  try {
+    const data = JSON.parse(event.data)
+    if (data.type === 'message') {
+      messages.value.push({ role: 'assistant', content: data.content })
+      scrollToBottom()
+    } else if (data.type === 'rag_sources') {
+      agentStore.ragSources = data.sources ?? []
+    } else if (data.type === 'error') {
+      console.error('[Chat WS] server error:', data.detail)
+      lastError.value = data.detail || 'Server error'
+    }
+    // Legacy filing.* events from ws.py are informational; ignore for chat UI.
+  } catch {
+    // Plain-text fallback (e.g. heartbeat or legacy echo)
+    if (event.data && event.data !== '') {
+      messages.value.push({ role: 'assistant', content: event.data })
+      scrollToBottom()
+    }
+  }
+}
+
+/**
+ * Post a behavioral tracking event to the backend.
+ * Failures are silently swallowed so they never block the UI.
+ */
+async function trackChatBehavior(eventType: string, value: number = 1.0) {
+  try {
+    await fetch(`${API_BASE}/api/users/behavior`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}),
+      },
+      body: JSON.stringify({
+        user_id: authStore.user?.id ?? 0,
+        event_type: eventType,
+        value,
+        page: 'chat',
+        current_mode: uiStore.mode,
+      }),
+    })
+  } catch {
+    // Fire-and-forget: ignore failures
+  }
+}
+
 const callBackend = async (path: string, body: object) => {
   const resp = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}),
+    },
     body: JSON.stringify(body),
   })
   if (!resp.ok) {
@@ -233,12 +303,20 @@ const ingestResult = (result: any) => {
     messages.value.push({ role: 'assistant', content: lastAi.content })
   }
   if (result.tax_breakdown) lastBreakdown.value = result.tax_breakdown
-  if (result.research_results) lastResearch.value = result.research_results
+  if (result.research_results) {
+    lastResearch.value = result.research_results
+    // Mirror to agentStore so other components can read RAG sources.
+    agentStore.ragSources = result.research_results
+  }
   if (result.thread_id) threadId.value = result.thread_id
 }
 
 const sendMessage = async (content: string) => {
   if (!content.trim()) return
+  if (isReadOnly.value) {
+    lastError.value = 'You have read-only access and cannot send messages.'
+    return
+  }
   if (!authStore.user?.id) {
     lastError.value = 'Please log in first - the chat needs your user_id.'
     return

@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import engine, Base
-from app.api import auth, users, sdui, ws, documents, filing_v2
+from app.api import auth, users, sdui, ws, documents, filing_v2, explain, behavior
 
 
 @asynccontextmanager
@@ -21,6 +21,8 @@ async def lifespan(app: FastAPI):
     with engine.begin() as _conn:
         _conn.execute(_text("CREATE EXTENSION IF NOT EXISTS vector;"))
     Base.metadata.create_all(bind=engine)
+    from app.agents_v2.graph import open_graph_pool
+    await open_graph_pool()
     print("Tax Filing System API starting up (Indian ITR-1 / FY2024-25)...")
     print("API documentation available at: http://localhost:8000/api/docs")
     print("Health check available at: http://localhost:8000/api/health")
@@ -41,6 +43,8 @@ async def lifespan(app: FastAPI):
 
     yield
     # Shutdown
+    from app.agents_v2.graph import close_graph_pool
+    await close_graph_pool()
     print("Tax Filing System API shutting down...")
 
 
@@ -64,6 +68,8 @@ app.include_router(sdui.router)
 app.include_router(ws.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(filing_v2.router)  # Indian tax filing pipeline (LangGraph + tax_engine_in)
+app.include_router(explain.router)    # XAI — /api/v2/explain endpoints
+app.include_router(behavior.router)   # Adaptive engine — /api/users/behavior
 
 # ============================================================================
 # CORS Middleware

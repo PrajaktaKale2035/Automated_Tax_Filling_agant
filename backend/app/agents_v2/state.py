@@ -48,6 +48,9 @@ class TaxFilingState(TypedDict):
     itr1_filing_id: Optional[int]             # FK to ITR1Filing row
     pdf_path: Optional[str]                   # Filesystem path to generated PDF
 
+    # Phase 1 additions - mode-adaptive UI
+    preferred_mode: Optional[str]             # "novice" | "intermediate" | "expert" | "accessibility"
+
 
 class UserProfile(TypedDict):
     """Structured user data extracted by interviewer agent"""

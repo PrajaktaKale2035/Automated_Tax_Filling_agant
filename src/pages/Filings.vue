@@ -106,11 +106,6 @@
           </Button>
         </Card>
       </div>
-
-      <Button variant="outline" @click="router.push('/dashboard')">
-        <ArrowLeft class="mr-2 h-4 w-4" />
-        Back to Dashboard
-      </Button>
     </div>
   </DynamicLayoutContainer>
 </template>
@@ -157,6 +152,10 @@ const loadError = ref('')
 const filings = ref<ITR1Filing[]>([])
 const submittingId = ref<number | null>(null)
 
+const authHeaders = () => ({
+  'Authorization': `Bearer ${authStore.token}`,
+})
+
 const refresh = async () => {
   loading.value = true
   loadError.value = ''
@@ -165,7 +164,7 @@ const refresh = async () => {
     const url = userId
       ? `${API_BASE}/api/v2/filings?user_id=${userId}`
       : `${API_BASE}/api/v2/filings`
-    const resp = await fetch(url)
+    const resp = await fetch(url, { headers: authHeaders() })
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}))
       throw new Error(body.detail || `HTTP ${resp.status}`)
@@ -180,7 +179,7 @@ const refresh = async () => {
 
 const downloadPdf = async (id: number) => {
   try {
-    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/pdf`)
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/pdf`, { headers: authHeaders() })
     if (!resp.ok) throw new Error(`PDF unavailable (HTTP ${resp.status})`)
     const blob = await resp.blob()
     const url = window.URL.createObjectURL(blob)
@@ -198,7 +197,7 @@ const downloadPdf = async (id: number) => {
 
 const exportJSON = async (id: number) => {
   try {
-    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`)
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`, { headers: authHeaders() })
     if (!resp.ok) throw new Error(`JSON unavailable (HTTP ${resp.status})`)
     const data = await resp.json()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -221,7 +220,7 @@ const submitToITDepartment = async (id: number) => {
     // E-filing to incometax.gov.in is not yet integrated. As a stub, we
     // download the IT-Dept-shaped ITR-1 JSON so the user can upload it manually
     // through the official portal's "Upload XML/JSON" path.
-    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`)
+    const resp = await fetch(`${API_BASE}/api/v2/filing/${id}/json`, { headers: authHeaders() })
     if (!resp.ok) throw new Error(`Filing not ready (HTTP ${resp.status})`)
     const data = await resp.json()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })

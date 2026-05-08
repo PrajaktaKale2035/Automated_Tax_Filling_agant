@@ -199,9 +199,63 @@ python -m pytest tests/ --ignore=tests/rag -q   # 71 tests, ~6s (sans RAG)
 
 These were intentionally deferred and are not bugs:
 
-1. **Real IT Dept PDF ingestion** — currently the RAG corpus is the curated `backend/tax_rules.txt`. The official Income Tax Act 1961, ITR-1 instructions (AY 2025-26), Finance Act 2024, and CBDT circulars on 80C/80D have not been fetched.
+1. **Real IT Dept PDF ingestion** — the RAG corpus is `backend/tax_rules.txt` + scraped content from `incometax.gov.in` (5 chunks). The full Income Tax Act 1961, ITR-1 instructions (AY 2025-26), Finance Act 2024, and CBDT circulars on 80C/80D have not been fetched.
 2. **E-filing submission** — no integration with incometax.gov.in. The system produces ITR-1 JSON in IT Dept schema shape but does not submit it.
 3. **AsyncPostgresSaver** — LangGraph currently uses `InMemorySaver` so threads do not survive restart. Switching to async Postgres persistence is Phase 3+.
 4. **Frontend tool modules** — `complianceTools.ts`, `advisoryTools.ts`, `documentProcessingTools.ts` still contain US tax thresholds. They aren't on the data-pipeline path (the actual pipeline goes through `taxCalculationTools.ts` → backend), but a future cleanup should rewrite them or delete unused tools.
 5. **Form 16 extractor** is regex-based. Low-confidence extractions return `extraction_status: "review_required"` so the user can correct fields. A future revision could fall back to GPT-4 with function calling for ambiguous documents.
 6. **RBAC** — `/api/users/...` admin checks are TODOs. Currently any authenticated user can list users.
+
+---
+
+## Session 2 changes — 2026-05-09
+
+### Bug fixes
+
+#### `backend/main.py`
+- **Broken imports**: `tax_forms` and `filing` modules were still referenced but deleted in Session 1. Fixed by removing them and keeping only `filing_v2`.
+- **CORS ports**: Vite dev server can bind to ports 8081–8083 when lower ports are busy. Added `http://localhost:8081`, `http://localhost:8082`, `http://localhost:8083`, and `http://127.0.0.1:8083` to `allow_origins`.
+
+#### `src/pages/WizardFiling.vue`
+- **Submit button stuck disabled**: The disabled condition was hardcoded as `currentStep === 3 && previewLoading`. For forms with more than 4 steps the review step is not step 3. Changed to `stepKey === 'review' && previewLoading` where `stepKey` is computed from the current step's `name` field.
+- **Review page not scrollable**: Nested flex layout was missing `overflow-hidden min-h-0` on the left panel div and the Card. Without `min-h-0`, CSS `min-height: auto` lets flex children grow past parent bounds, defeating `overflow-y-auto`. Fix: added `overflow-hidden min-h-0` to the column div and Card.
+
+#### `src/pages/Chat.vue`
+- **Chat message area not scrollable**: Same root cause as WizardFiling. Fix:
+  - Left column div: added `overflow-hidden min-h-0`
+  - Header div: added `flex-shrink-0` so it never compresses
+  - Card: added `min-h-0`
+  - Input footer: added `flex-shrink-0`
+
+### RAG improvements — `backend/app/rag/ingest.py`
+
+Scraped web content includes metadata headers in the format:
+```
+[SOURCE: https://...] [SCRAPED: 2026-05-08] [FY: 2024-25]
+```
+These headers were being embedded as part of chunk text, polluting vector similarity. Fixed by:
+- Adding `_SCRAPED_HEADER_RE` compiled regex to detect the header pattern.
+- Adding `_strip_scraped_header(chunk)` which returns `(cleaned_content, source_url | None)`.
+- Updating the `ingest_text` loop to embed `cleaned_content`, store the scraped URL in `extra_metadata["source_url"]` and in the `source` column.
+
+Re-ingested the full corpus after the fix — 62 chunks total (57 from `tax_rules.txt` + 5 scraped chunks from `incometax.gov.in`).
+
+### Database
+
+Sample credentials for local development (created 2026-05-09):
+
+| Field | Value |
+|---|---|
+| Email | `demo@taxfiler.in` |
+| Password | `Test@1234` |
+| Role | `filer` |
+
+To reset and recreate run from `backend/`:
+```sql
+DELETE FROM itr1_filings;
+DELETE FROM form16;
+DELETE FROM audit_logs;
+DELETE FROM user_profiles;
+DELETE FROM users;
+```
+Then re-create the user via `/api/auth/register` or directly with `get_password_hash` from `passlib`.

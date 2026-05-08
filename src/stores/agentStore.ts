@@ -4,6 +4,26 @@ import { OrchestratorAgent } from '@/agents/specialized/OrchestratorAgent';
 import type { AgentMessage, AgentState, AgentResponse } from '@/agents/types';
 import type { LLMConfig } from '@/agents/llm/LLMProvider';
 
+/** Data extracted from Form 16 OCR and stored for cross-page prefill. */
+export interface Form16Data {
+  gross_salary?: number
+  employer_name?: string
+  tds_paid?: number
+  pan?: string
+  fy?: string
+}
+
+/** A single RAG source returned by the backend alongside a chat reply. */
+export interface RagSource {
+  id?: string | number
+  url?: string
+  title?: string
+  section?: string
+  source?: string
+  score?: number
+  description?: string
+}
+
 export const useAgentStore = defineStore('agent', () => {
   // State
   const orchestrator = ref<OrchestratorAgent | null>(null);
@@ -12,6 +32,15 @@ export const useAgentStore = defineStore('agent', () => {
   const currentAgentStatuses = ref<Record<string, AgentState>>({});
   const messageHistory = ref<AgentMessage[]>([]);
   const lastResponse = ref<AgentResponse | null>(null);
+
+  /** Form 16 OCR data stored after a successful upload in Documents.vue.
+   *  NewFiling.vue reads this on mount to prefill salary/TDS fields. */
+  const form16Data = ref<Form16Data | null>(null);
+
+  /** Latest RAG sources returned by the backend alongside a chat reply.
+   *  Chat.vue reads this to populate the sources sidebar. */
+  const ragSources = ref<RagSource[]>([]);
+
   const currentProvider = ref<LLMConfig>({
     provider: 'qwen',
     model: 'qwen/qwen-2.5-72b-instruct:free',
@@ -204,6 +233,8 @@ export const useAgentStore = defineStore('agent', () => {
     messageHistory,
     lastResponse,
     currentProvider,
+    form16Data,
+    ragSources,
 
     // Computed
     allAgentsIdle,

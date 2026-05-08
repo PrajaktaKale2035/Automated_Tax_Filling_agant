@@ -3,12 +3,24 @@
 Phase 0: replaces US-shaped tables (W2Form, Form1099, Dependent, TaxForm) with
 Indian-shaped tables (Form16, ITR1Filing) and adds PAN/Aadhaar to User.
 Phase 1: adds RagDocument with pgvector embedding column for IT Dept rulebook RAG.
+Phase 2: adds UserRole enum (filer/helper/read_only) + role column on User,
+         age_category on ITR1Filing for senior-citizen slab logic.
 """
+import enum
+
 from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, Text, JSON, DateTime
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
 from app.database import Base
+
+
+class UserRole(str, enum.Enum):
+    """Role that governs what actions a user may perform in the filing system."""
+    filer = "filer"          # Default: can create and submit own filings
+    helper = "helper"        # Tax professional helping a filer: read + compute, no submit
+    read_only = "read_only"  # Auditor / observer: view only, cannot compute or submit
 
 
 # Embedding dimension for SentenceTransformer all-MiniLM-L6-v2 (used by Phase 1 RAG).
@@ -25,6 +37,9 @@ class User(Base):
     full_name = Column(String)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+
+    # Role-based access control
+    role = Column(SAEnum(UserRole), default=UserRole.filer, server_default="filer", nullable=False)
 
     # India identifiers (encrypted at rest via app.security)
     pan_encrypted = Column(String, nullable=True, index=True)
@@ -128,7 +143,11 @@ class ITR1Filing(Base):
     form16_id = Column(Integer, ForeignKey("form16.id"), nullable=True)
 
     assessment_year = Column(String, nullable=False)
+    form_type = Column(String(10), default="ITR-1", nullable=False)
     regime = Column(String, nullable=False)  # "old" | "new"
+    # Age category drives senior-citizen and super-senior slab boundaries.
+    # Values: "general" (<60), "senior" (60-79), "super_senior" (80+)
+    age_category = Column(String(20), default="general", nullable=False)
 
     # Computed values (from tax_engine_in.compute_filing)
     gross_income = Column(Float, default=0.0)
@@ -138,6 +157,12 @@ class ITR1Filing(Base):
     surcharge = Column(Float, default=0.0)
     cess = Column(Float, default=0.0)
     total_tax = Column(Float, default=0.0)
+    capital_gains_stcg_equity = Column(Float, default=0.0)
+    capital_gains_ltcg_equity = Column(Float, default=0.0)
+    capital_gains_stcg_tax = Column(Float, default=0.0)
+    capital_gains_ltcg_tax = Column(Float, default=0.0)
+    house_property_income = Column(Float, default=0.0)
+    business_income = Column(Float, default=0.0)
     tds_paid = Column(Float, default=0.0)
     refund_due = Column(Float, default=0.0)
     tax_due = Column(Float, default=0.0)

@@ -16,8 +16,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_active_user
+from app.api.deps import require_role
 from app.database import get_db
-from app.models import ITR1Filing, User, Form16
+from app.models import ITR1Filing, User, Form16, UserRole
 from app.services.tax_engine_in import compute_filing
 from app.services.itr1_json_builder import build_itr1_json
 from app.services.pdf_generator import generate_itr1_pdf
@@ -39,6 +40,13 @@ class CalcPreviewRequest(BaseModel):
     regime: Literal["old", "new"]
     is_salary_income: bool = True
     fy: str = "2024-25"
+    age: int = Field(default=30, ge=0, le=120, description="Taxpayer age in years")
+    # Additional income sources
+    capital_gains_stcg_equity: int = Field(default=0, ge=0)
+    capital_gains_ltcg_equity: int = Field(default=0, ge=0)
+    capital_gains_other: int = Field(default=0, ge=0)
+    house_property_income: int = 0
+    business_income: int = Field(default=0, ge=0)
 
 
 @router.post("/calc/preview")
@@ -50,6 +58,12 @@ def calc_preview(req: CalcPreviewRequest):
         regime=req.regime,
         is_salary_income=req.is_salary_income,
         fy=req.fy,
+        age=req.age,
+        capital_gains_stcg_equity=req.capital_gains_stcg_equity,
+        capital_gains_ltcg_equity=req.capital_gains_ltcg_equity,
+        capital_gains_other=req.capital_gains_other,
+        house_property_income=req.house_property_income,
+        business_income=req.business_income,
     )
     return breakdown.to_dict()
 
@@ -72,6 +86,13 @@ class FilingStartRequest(BaseModel):
     salary: Optional[Dict[str, float]] = None     # {"gross": ..., "tds": ...}
     deductions: Optional[Dict[str, float]] = None  # {"80c": ..., "80d": ...}
     client_id: Optional[str] = None                # for WS event routing
+    age: int = Field(default=30, ge=0, le=120, description="Taxpayer age in years")
+    form_type: str = "ITR-1"
+    capital_gains_stcg_equity: int = Field(default=0, ge=0)
+    capital_gains_ltcg_equity: int = Field(default=0, ge=0)
+    capital_gains_other: int = Field(default=0, ge=0)
+    house_property_income: int = 0
+    business_income: int = Field(default=0, ge=0)
 
 
 class FilingStartResponse(BaseModel):
@@ -94,7 +115,12 @@ async def _emit(client_id: Optional[str], event: str, **payload) -> None:
 
 
 @router.post("/filing/start", response_model=FilingStartResponse)
-async def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
+async def start_filing(
+    req: FilingStartRequest,
+    db: Session = Depends(get_db),
+    # read_only users may not create or compute filings.
+    _current_user: User = Depends(require_role(UserRole.filer, UserRole.helper)),
+):
     """Compute a filing from either a Form 16 row or a manual JSON payload."""
     await _emit(req.client_id, "filing.starting", user_id=req.user_id, regime=req.regime)
 
@@ -133,6 +159,12 @@ async def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
         deductions=deductions,
         regime=req.regime,
         is_salary_income=True,
+        age=req.age,
+        capital_gains_stcg_equity=req.capital_gains_stcg_equity,
+        capital_gains_ltcg_equity=req.capital_gains_ltcg_equity,
+        capital_gains_other=req.capital_gains_other,
+        house_property_income=req.house_property_income,
+        business_income=req.business_income,
     )
 
     user_block = {
@@ -155,6 +187,7 @@ async def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
         user_id=req.user_id,
         form16_id=form16.id if form16 else None,
         assessment_year=assessment_year,
+        form_type=req.form_type,
         regime=req.regime,
         gross_income=breakdown.gross_income,
         taxable_income=breakdown.taxable_income,
@@ -166,6 +199,12 @@ async def start_filing(req: FilingStartRequest, db: Session = Depends(get_db)):
         tds_paid=tds_paid,
         refund_due=max(0, tds_paid - breakdown.total_tax),
         tax_due=max(0, breakdown.total_tax - tds_paid),
+        capital_gains_stcg_equity=breakdown.capital_gains_stcg_equity,
+        capital_gains_ltcg_equity=breakdown.capital_gains_ltcg_equity,
+        capital_gains_stcg_tax=breakdown.capital_gains_stcg_tax,
+        capital_gains_ltcg_tax=breakdown.capital_gains_ltcg_tax,
+        house_property_income=breakdown.house_property_income,
+        business_income=breakdown.business_income,
         itr1_json=itr_json,
         status="computed",
     )
@@ -264,6 +303,7 @@ def list_filings(
             "user_id": r.user_id,
             "form16_id": r.form16_id,
             "assessment_year": r.assessment_year,
+            "form_type": r.form_type or "ITR-1",
             "regime": r.regime,
             "status": r.status,
             "gross_income": int(r.gross_income or 0),
