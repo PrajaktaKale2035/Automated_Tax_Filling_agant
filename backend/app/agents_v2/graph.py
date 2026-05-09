@@ -123,12 +123,70 @@ def create_postgres_checkpointer():
         _graph_pool = AsyncConnectionPool(
             DATABASE_URL,
             open=False,
-            kwargs={"autocommit": True, "prepare_threshold": 0},
+            min_size=1,
+            max_size=10,
+            max_idle=300,           # close connections idle > 5 min
+            max_lifetime=3600,      # recycle connections after 1 hour
+            reconnect_timeout=30,   # retry broken connections for up to 30 s
+            # Validate every connection before handing it out — without this,
+            # the pool can return a TCP-dead socket and the caller hits
+            # "consuming input failed: could not receive data from server"
+            # mid-query. With it, dead connections are detected on getconn()
+            # and a fresh one is opened transparently.
+            check=AsyncConnectionPool.check_connection,
+            kwargs={
+                "autocommit": True,
+                "prepare_threshold": 0,
+                # TCP keepalives — prevent Windows from aborting idle sockets
+                "keepalives": 1,
+                "keepalives_idle": 30,      # send first probe after 30 s idle
+                "keepalives_interval": 10,  # retry probe every 10 s
+                "keepalives_count": 5,      # drop after 5 unanswered probes
+            },
         )
         _graph_checkpointer = AsyncPostgresSaver(_graph_pool)
         return _graph_checkpointer
     except Exception:
         return None
+
+
+# Substring matchers for transient psycopg connection drops. We look at the
+# stringified exception (psycopg sometimes wraps these) so we don't need to
+# import the concrete OperationalError types.
+_TRANSIENT_PG_MARKERS = (
+    "consuming input failed",
+    "could not receive data from server",
+    "server closed the connection",
+    "connection is bad",
+    "connection is closed",
+    "connection aborted",
+    "connection reset",
+    "10053",
+    "10054",
+    "broken pipe",
+    "ssl connection has been closed unexpectedly",
+)
+
+
+def is_transient_pg_error(exc: BaseException) -> bool:
+    """Return True if `exc` looks like a recoverable Postgres connection drop."""
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _TRANSIENT_PG_MARKERS)
+
+
+async def refresh_pool() -> None:
+    """Force the connection pool to discard dead sockets and re-validate.
+
+    Called from the chat endpoints after we hit a transient connection error
+    so the next attempt starts with known-good connections.
+    """
+    if _graph_pool is None:
+        return
+    try:
+        await _graph_pool.check()
+    except Exception:
+        # Don't let pool refresh raise; the retry will surface the real error.
+        pass
 
 
 async def open_graph_pool():
@@ -138,7 +196,8 @@ async def open_graph_pool():
     if checkpointer is None or _graph_pool is None:
         return
     try:
-        await _graph_pool.open()
+        await _graph_pool.open(wait=True, timeout=10)
+        await _graph_pool.check()   # validate all connections in pool on startup
         await checkpointer.setup()
         # Recompile the graph with the live postgres checkpointer
         workflow = StateGraph(TaxFilingState)

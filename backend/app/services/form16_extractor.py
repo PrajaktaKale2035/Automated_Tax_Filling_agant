@@ -168,7 +168,9 @@ def extract_form16(raw_text: str) -> Form16Data:
         "professional_tax":           ["professional tax", "tax on employment"],
         "deductions_80c":             ["80c", "section 80c"],
         "deductions_80d":             ["80d", "section 80d"],
-        "tds_deducted":               ["tax deducted at source", "tds deducted", "total tds"],
+        # Order matters - "tax deducted at source" appears in the Form 16 title
+        # banner, so try the more specific "total tds" labels first.
+        "tds_deducted":               ["total tds", "tds deducted at source", "tds deducted"],
     }
     for field, labels in label_map.items():
         for lbl in labels:

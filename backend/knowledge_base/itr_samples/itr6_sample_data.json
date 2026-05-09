@@ -1,0 +1,39 @@
+{
+  "ITR": {
+    "ITR6": {
+      "CreationInfo": {
+        "SWVersionNo": "1.3",
+        "JSONCreatedBy": "Automated Tax Filling Agent",
+        "JSONCreationDate": "2026-05-05"
+      },
+      "CompanyInfo": {
+        "CompanyName": "ABC Corporation Ltd",
+        "CIN": "L12345MH2010PLC123456",
+        "RegisteredOffice": "Mumbai",
+        "AccountingYear": "FY 2025-26"
+      },
+      "FinancialStatements": {
+        "TotalRevenue": 50000000,
+        "NetProfit": 5000000,
+        "TotalAssets": 100000000,
+        "TotalLiabilities": 40000000
+      },
+      "DirectorsInfo": {
+        "DirectorCount": 3,
+        "DirectorDetails": [
+          {
+            "DirectorPAN": "ABCDE1111A",
+            "DirectorName": "Director One",
+            "AppointmentDate": "2015-01-01"
+          }
+        ]
+      },
+      "ShareholdingPattern": {
+        "PromotorHolding": 500000,
+        "AssociateCompany": 200000,
+        "PublicShareholders": 800000,
+        "TotalShares": 1500000
+      }
+    }
+  }
+}

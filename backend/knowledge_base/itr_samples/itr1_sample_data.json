@@ -1,0 +1,63 @@
+{
+  "ITR": {
+    "ITR1": {
+      "CreationInfo": {
+        "SWVersionNo": "1.7",
+        "JSONCreatedBy": "Automated Tax Filling Agent",
+        "JSONCreationDate": "2026-05-05"
+      },
+      "Form_ITR1": {
+        "FormName": "ITR-1",
+        "FormQtrMnth": "12",
+        "FormYear": "2025"
+      },
+      "PersonalInfo": {
+        "PAN": "ABCDE1234F",
+        "Name": "John Doe",
+        "Address": {
+          "ResidentialStatus": "RES",
+          "AddressLine1": "123 Main Street",
+          "AddressLine2": "Apt 4B",
+          "City": "New York",
+          "State": "NY",
+          "PinCode": "10001"
+        },
+        "Email": "john@example.com",
+        "Phone": "+1234567890"
+      },
+      "FilingStatus": {
+        "AssessmentYear": "2025-26",
+        "ReturnType": "O",
+        "LastModifiedDate": "2026-05-05"
+      },
+      "ITR1_IncomeDeductions": {
+        "AggregateIncome": 1500000,
+        "SalaryIncome": 1200000,
+        "HousePropertyIncome": 200000,
+        "InterestOnSavings": 50000,
+        "OtherSources": 50000,
+        "GrossTotal": 1500000
+      },
+      "Schedule80C": {
+        "LifeInsurancePremium": 50000,
+        "PPFContribution": 50000,
+        "MutualFundSIP": 50000,
+        "TotalChapVIADeduction": 150000
+      },
+      "Schedule80D": {
+        "MediclaimPremium": 25000,
+        "ParentMediclaimPremium": 25000
+      },
+      "TaxPaid": {
+        "TDSOnSalary": 35000,
+        "AdvanceTax": 20000,
+        "TotalTaxPaid": 55000
+      },
+      "Refund": {
+        "RefundAmount": 12000,
+        "RefundMode": "T",
+        "BankAccountNumber": "9876543210123456"
+      }
+    }
+  }
+}

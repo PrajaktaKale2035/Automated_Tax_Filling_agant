@@ -59,7 +59,15 @@
                     message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
                   )"
                 >
-                  <p class="text-sm whitespace-pre-wrap">{{ message.content }}</p>
+                  <!-- User messages stay plain text; assistant replies render as markdown. -->
+                  <p v-if="message.role === 'user'" class="text-sm whitespace-pre-wrap">
+                    {{ message.content }}
+                  </p>
+                  <div
+                    v-else
+                    class="prose prose-sm dark:prose-invert max-w-none text-sm"
+                    v-html="renderMarkdown(message.content)"
+                  />
                 </div>
                 <div
                   v-if="message.role === 'user'"
@@ -172,9 +180,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Bot, User, Send } from 'lucide-vue-next'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import DynamicLayoutContainer from '@/components-vue/dynamic/DynamicLayoutContainer.vue'
 import Card from '@/components-vue/ui/Card.vue'
 import CardHeader from '@/components-vue/ui/CardHeader.vue'
@@ -196,6 +206,21 @@ const uiStore = useUiStore()
 
 /** True when the current user has read_only role (cannot send messages). */
 const isReadOnly = computed(() => authStore.user?.role === 'read_only')
+
+// Configure marked once: GitHub-flavoured markdown, line breaks honoured.
+marked.setOptions({ gfm: true, breaks: true })
+
+/** Render markdown safely for assistant messages. Sanitised with DOMPurify
+ *  so model-generated content can't inject <script> or event handlers. */
+function renderMarkdown(content: string): string {
+  if (!content) return ''
+  const raw = marked.parse(content, { async: false }) as string
+  return DOMPurify.sanitize(raw, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['style', 'script', 'iframe'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick'],
+  })
+}
 
 interface Message { role: 'user' | 'assistant'; content: string }
 interface ResearchResult { section: string; description: string; source: string; score: number }
@@ -354,4 +379,38 @@ const sendMessage = async (content: string) => {
 }
 
 const handleSubmit = () => sendMessage(inputMessage.value)
+
+// ── WebSocket: stream live agent / filing.* events ───────────────────────────
+//
+// The backend exposes /api/ws/{client_id}; on connect it sends a "connected"
+// frame and forwards filing.* events keyed to the same client_id. We open the
+// socket on mount when the user is logged in and close it on unmount.
+let chatSocket: WebSocket | null = null
+
+function openChatSocket() {
+  if (!authStore.user?.id) return
+  if (chatSocket && chatSocket.readyState <= 1) return
+  const httpBase = API_BASE.replace(/\/$/, '')
+  const wsBase = httpBase.replace(/^http/i, 'ws')
+  const clientId = `chat-${authStore.user.id}`
+  try {
+    chatSocket = new WebSocket(`${wsBase}/api/ws/${clientId}`)
+    chatSocket.onmessage = handleWsMessage
+    chatSocket.onerror = () => { /* swallow — REST path still works */ }
+    chatSocket.onclose = () => { chatSocket = null }
+  } catch {
+    chatSocket = null
+  }
+}
+
+onMounted(() => {
+  openChatSocket()
+})
+
+onBeforeUnmount(() => {
+  if (chatSocket) {
+    try { chatSocket.close() } catch { /* ignore */ }
+    chatSocket = null
+  }
+})
 </script>

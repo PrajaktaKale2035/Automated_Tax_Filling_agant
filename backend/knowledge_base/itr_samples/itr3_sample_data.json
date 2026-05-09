@@ -1,0 +1,38 @@
+{
+  "ITR": {
+    "ITR3": {
+      "CreationInfo": {
+        "SWVersionNo": "1.3",
+        "JSONCreatedBy": "Automated Tax Filling Agent",
+        "JSONCreationDate": "2026-05-05"
+      },
+      "PersonalInfo": {
+        "PAN": "BCDEF2345G",
+        "Name": "Jane Smith",
+        "BusinessName": "Smith Consulting LLC"
+      },
+      "ScheduleBP": {
+        "BusinessDescription": "Professional Consulting Services",
+        "DateOfCommencementOfBusiness": "2015-01-01",
+        "Nature": "Service",
+        "GrossProfit": 500000,
+        "NetProfit": 350000
+      },
+      "ScheduleBA": {
+        "RevenueFromOperations": 1000000,
+        "OtherIncome": 50000,
+        "EmployeeExpense": 200000,
+        "RentExpense": 100000,
+        "Depreciation": 50000,
+        "ProfessionalFees": 30000,
+        "InterestPaid": 20000,
+        "NetProfit": 350000
+      },
+      "ScheduleCG": {
+        "LongTermCapitalGain": 100000,
+        "ShortTermCapitalGain": 50000,
+        "NetCapitalGain": 150000
+      }
+    }
+  }
+}

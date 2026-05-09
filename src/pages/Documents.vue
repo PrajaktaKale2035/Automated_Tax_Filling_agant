@@ -50,6 +50,74 @@
         </CardContent>
       </Card>
 
+      <!-- Previous-year ITR upload (PDF / JSON) -->
+      <Card
+        :class="cn(
+          'border-2 border-dashed transition-all duration-300',
+          isDraggingItr ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+        )"
+        @dragover.prevent="isDraggingItr = true"
+        @dragleave.prevent="isDraggingItr = false"
+        @drop.prevent="handleItrDrop"
+      >
+        <CardContent class="flex flex-col items-center justify-center py-10 text-center space-y-3">
+          <div class="p-3 rounded-full bg-blue-500/10">
+            <FileJson class="h-7 w-7 text-blue-500" />
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold">Upload last year's ITR (PDF or JSON)</h3>
+            <p class="text-sm text-muted-foreground">
+              The ingestion agent parses your previous return and pre-fills a new filing automatically.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" :disabled="uploadingItr" @click="itrFileInput?.click()">
+              {{ uploadingItr ? 'Parsing...' : 'Browse ITR file' }}
+            </Button>
+            <input
+              ref="itrFileInput"
+              type="file"
+              class="hidden"
+              accept=".pdf,.json"
+              @change="handleItrSelect"
+            />
+          </div>
+          <div v-if="itrStatus" :class="cn('flex items-center gap-2 text-sm font-medium', itrStatusError ? 'text-destructive' : 'text-primary')">
+            <AlertCircle class="h-4 w-4" />
+            {{ itrStatus }}
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- ITR parse result -->
+      <Card v-if="itrResult">
+        <CardHeader>
+          <div class="flex items-center justify-between">
+            <CardTitle>Previous ITR — extracted</CardTitle>
+            <Button size="sm" @click="useItrPrefill">
+              Use this to start a new filing
+              <ArrowRight class="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent class="space-y-2 text-sm">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div v-for="(value, key) in displayedItrFields" :key="key">
+              <div class="text-xs uppercase tracking-wider text-muted-foreground">{{ key }}</div>
+              <div class="font-mono">{{ value }}</div>
+            </div>
+          </div>
+          <div class="flex justify-between pt-2 border-t mt-2">
+            <span class="text-muted-foreground">Confidence</span>
+            <span class="font-mono">{{ ((itrResult.extraction_confidence || 0) * 100).toFixed(0) }}%</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-muted-foreground">Status</span>
+            <span class="font-mono">{{ itrResult.extraction_status }}</span>
+          </div>
+        </CardContent>
+      </Card>
+
       <!-- Last upload result -->
       <Card v-if="lastResult">
         <CardHeader>
@@ -126,9 +194,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Upload, CheckCircle, FileText, AlertCircle } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, FileText, FileJson, AlertCircle } from 'lucide-vue-next'
 import DynamicLayoutContainer from '@/components-vue/dynamic/DynamicLayoutContainer.vue'
 import Card from '@/components-vue/ui/Card.vue'
 import CardHeader from '@/components-vue/ui/CardHeader.vue'
@@ -167,6 +235,36 @@ const uploadStatus = ref<string | null>(null)
 const statusError = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const lastResult = ref<any>(null)
+
+// ── Previous-year ITR upload state ────────────────────────────────────────────
+const isDraggingItr = ref(false)
+const uploadingItr = ref(false)
+const itrStatus = ref<string | null>(null)
+const itrStatusError = ref(false)
+const itrFileInput = ref<HTMLInputElement | null>(null)
+const itrResult = ref<any>(null)
+
+const displayedItrFields = computed(() => {
+  const r = itrResult.value
+  if (!r) return {}
+  const f = r.extracted_fields ?? {}
+  const view: Record<string, string> = {}
+  if (f.assessment_year) view['AY'] = f.assessment_year
+  if (f.form_type) view['Form'] = f.form_type
+  if (f.pan) view['PAN'] = f.pan
+  if (f.regime) view['Regime'] = f.regime
+  if (f.gross_salary) view['Gross Salary'] = `₹${Number(f.gross_salary).toLocaleString('en-IN')}`
+  if (f.house_property_income) view['House Property'] = `₹${Number(f.house_property_income).toLocaleString('en-IN')}`
+  if (f.capital_gains) view['Capital Gains'] = `₹${Number(f.capital_gains).toLocaleString('en-IN')}`
+  if (f.business_income) view['Business'] = `₹${Number(f.business_income).toLocaleString('en-IN')}`
+  if (f.other_income) view['Other Income'] = `₹${Number(f.other_income).toLocaleString('en-IN')}`
+  if (f.deductions_80c) view['80C'] = `₹${Number(f.deductions_80c).toLocaleString('en-IN')}`
+  if (f.deductions_80d) view['80D'] = `₹${Number(f.deductions_80d).toLocaleString('en-IN')}`
+  if (f.tds_paid) view['TDS Paid'] = `₹${Number(f.tds_paid).toLocaleString('en-IN')}`
+  if (f.taxable_income) view['Taxable Income'] = `₹${Number(f.taxable_income).toLocaleString('en-IN')}`
+  if (f.total_tax) view['Total Tax'] = `₹${Number(f.total_tax).toLocaleString('en-IN')}`
+  return view
+})
 
 const inferCategory = (filename: string): string => {
   const name = filename.toLowerCase()
@@ -255,5 +353,99 @@ const uploadOne = async (file: File) => {
   } finally {
     uploading.value = false
   }
+}
+
+// ── Previous-year ITR upload handlers ─────────────────────────────────────────
+const handleItrDrop = (e: DragEvent) => {
+  isDraggingItr.value = false
+  const f = e.dataTransfer?.files?.[0]
+  if (f) uploadItr(f)
+}
+
+const handleItrSelect = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  if (f) uploadItr(f)
+  input.value = ''
+}
+
+const uploadItr = async (file: File) => {
+  if (!authStore.token) {
+    itrStatus.value = 'Please log in to upload.'
+    itrStatusError.value = true
+    return
+  }
+  const ext = (file.name.split('.').pop() || '').toLowerCase()
+  if (ext !== 'pdf' && ext !== 'json') {
+    itrStatus.value = 'Only .pdf or .json ITR files are supported here.'
+    itrStatusError.value = true
+    return
+  }
+
+  uploadingItr.value = true
+  itrStatusError.value = false
+  itrStatus.value = `Parsing ${file.name}...`
+  itrResult.value = null
+
+  const fd = new FormData()
+  fd.append('file', file)
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/documents/upload-itr`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authStore.token}` },
+      body: fd,
+    })
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}))
+      throw new Error(body.detail || `HTTP ${resp.status}`)
+    }
+    const data = await resp.json()
+    itrResult.value = data
+
+    // Stash for cross-page prefill.
+    const f = data.extracted_fields ?? {}
+    agentStore.itrImportData = {
+      id: data.id,
+      assessment_year: f.assessment_year,
+      form_type: f.form_type,
+      pan: f.pan,
+      name: f.name,
+      regime: f.regime,
+      gross_salary: f.gross_salary,
+      house_property_income: f.house_property_income,
+      capital_gains: f.capital_gains,
+      business_income: f.business_income,
+      other_income: f.other_income,
+      deductions_80c: f.deductions_80c,
+      deductions_80d: f.deductions_80d,
+      deductions_other: f.deductions_other,
+      taxable_income: f.taxable_income,
+      total_tax: f.total_tax,
+      tds_paid: f.tds_paid,
+      refund_due: f.refund_due,
+      tax_due: f.tax_due,
+      extraction_confidence: data.extraction_confidence,
+      extraction_status: data.extraction_status,
+    }
+
+    if (data.extraction_status === 'parsed') {
+      itrStatus.value = `ITR parsed (confidence ${(data.extraction_confidence * 100).toFixed(0)}%). Click "Use this to start a new filing".`
+    } else if (data.extraction_status === 'review_required') {
+      itrStatus.value = `Parsed with low confidence — please review extracted fields before using.`
+    } else {
+      itrStatus.value = `Parse failed. Try uploading the JSON download from the IT portal instead.`
+      itrStatusError.value = true
+    }
+  } catch (e: any) {
+    itrStatusError.value = true
+    itrStatus.value = e.message || 'Upload failed'
+  } finally {
+    uploadingItr.value = false
+  }
+}
+
+const useItrPrefill = () => {
+  router.push('/filing/new')
 }
 </script>

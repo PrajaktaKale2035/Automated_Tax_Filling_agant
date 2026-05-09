@@ -1,0 +1,26 @@
+{
+  "samples": {
+    "ITR-1": {
+      "description": "Sample data for ITR-1 (Salaried Individual)",
+      "file": "itr1_sample_data.json",
+      "use_case": "Individual with salary, house property, and other income"
+    },
+    "ITR-3": {
+      "description": "Sample data for ITR-3 (Business Owner)",
+      "file": "itr3_sample_data.json",
+      "use_case": "Individual with business/profession income"
+    },
+    "ITR-6": {
+      "description": "Sample data for ITR-6 (Company)",
+      "file": "itr6_sample_data.json",
+      "use_case": "Company tax return with financial statements"
+    }
+  },
+  "notes": [
+    "These are simplified templates showing the basic structure",
+    "Actual ITR returns require all fields specified in schemas",
+    "Date format must be YYYY-MM-DD (ISO 8601)",
+    "Numeric values should match the specified data types",
+    "Validate against the JSON schemas before submission"
+  ]
+}

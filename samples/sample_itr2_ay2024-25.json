@@ -1,0 +1,95 @@
+{
+  "_comment": "Sample ITR-2 JSON: salary + capital gains (equity STCG/LTCG) + house property. Old regime. Tests the ingestion agent's ITR-2 paths.",
+  "ITR": {
+    "ITR2": {
+      "Form_ITR2": {
+        "FormName": "ITR-2",
+        "Description": "For Indls and HUFs not having Income from Profits and Gains of Business or Profession",
+        "AssessmentYear": "2024-25",
+        "SchemaVer": "Ver1.0",
+        "FormVer": "Ver1.0"
+      },
+      "PartA_GEN1": {
+        "PersonalInfo": {
+          "AssesseeName": { "FirstName": "Priya", "SurNameOrOrgName": "Iyer" },
+          "PAN": "BHFPI9876K",
+          "DOB": "1985-09-12",
+          "AadhaarCardNo": "210987654321"
+        },
+        "FilingStatus": { "OptingNewTaxRegime": "N" }
+      },
+      "ScheduleS": {
+        "TotalGrossSalary": 2400000,
+        "Salaries": [
+          {
+            "NameOfEmployer": "Acme Corp Pvt Ltd",
+            "TANofEmployer": "BLRA12345C",
+            "Salary": 2400000,
+            "DeductionUS16": 50000
+          }
+        ]
+      },
+      "ScheduleHP": {
+        "TotalIncomeChargeableUnHP": 240000,
+        "PropertyDetails": [
+          {
+            "AddrDetail": { "AddrDetail1": "Flat 5B, Lake View Apts" },
+            "AnnualLetableValue": 360000,
+            "TaxPaidlocalAuth": 12000,
+            "AnnualValue": 348000,
+            "StdDeduction": 104400,
+            "IntOnBorwCap": 200000,
+            "IncomeOfHP": 240000
+          }
+        ]
+      },
+      "ScheduleCGFor23": {
+        "ShortTermCapGainFor23": {
+          "EquityMFonSTT": { "EquityMFonSTTDtls": { "BalanceCGAfterLossAdj": 60000 } }
+        },
+        "LongTermCapGain23": {
+          "EquityMFonSTT112A": { "EquityMFonSTTDtls": { "BalanceCGAfterLossAdj": 220000 } }
+        }
+      },
+      "ScheduleOS": { "TotIncFromOS": 45000 },
+      "ScheduleVIA": {
+        "DeductUndChapVIA": {
+          "Section80C": 150000,
+          "Section80D": 30000,
+          "Section80G": 25000,
+          "Section80TTA": 10000,
+          "TotalChapVIADeductions": 215000
+        }
+      },
+      "PartB-TI": {
+        "Salaries": 2350000,
+        "IncomeFromHP": 240000,
+        "CapGain": 280000,
+        "IncFromOS": 45000,
+        "GrossTotalIncome": 2915000,
+        "DeductionsUnderScheduleVIA": 215000,
+        "TotalIncome": 2700000
+      },
+      "PartB-TTI": {
+        "ComputationOfTaxLiability": {
+          "TaxPayableOnTI": { "TaxAtNormalRatesOnAggrInc": 539000 },
+          "Rebate87A": 0,
+          "Surcharge25Per": 0,
+          "EducationCess": 21560,
+          "GrossTaxLiability": 560560,
+          "TotalTaxPayable": 560560
+        },
+        "TaxPaid": {
+          "TaxesPaid": {
+            "TDS": 540000,
+            "TCS": 0,
+            "AdvanceTax": 25000,
+            "SelfAssessmentTax": 0,
+            "TotalTaxesPaid": 565000
+          }
+        },
+        "Refund": { "RefundDue": 4440 }
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_comment": "Sample ITR-4 (Sugam) JSON: presumptive business income u/s 44AD. New regime.",
+  "ITR": {
+    "ITR4": {
+      "Form_ITR4": {
+        "FormName": "ITR-4",
+        "Description": "For Individuals, HUFs and Firms (other than LLP) with presumptive income from business/profession",
+        "AssessmentYear": "2024-25",
+        "SchemaVer": "Ver1.0",
+        "FormVer": "Ver1.0"
+      },
+      "PersonalInfo": {
+        "AssesseeName": { "FirstName": "Anjali", "SurNameOrOrgName": "Mehta" },
+        "PAN": "CDFPM5678L",
+        "DOB": "1988-12-03",
+        "AadhaarCardNo": "345678901234"
+      },
+      "FilingStatus": { "OptingNewTaxRegime": "Y" },
+      "IncomeDeductions": {
+        "GrossSalary": 0,
+        "IncomeFromHP": 0,
+        "IncomeOthSrc": 12000,
+        "DeductUndChapVIA": { "Section80C": 50000, "Section80D": 15000, "TotalChapVIADeductions": 0 }
+      },
+      "Schedule_BP": {
+        "PresumptiveBusiness44AD": {
+          "GrossTurnoverOrReceipts": 4500000,
+          "PresumptiveIncome": 360000
+        }
+      },
+      "PartB_TI": {
+        "TotalIncome": 372000
+      },
+      "TaxComputation": {
+        "TaxPayableOnTotalInc": 0,
+        "Rebate87A": 0,
+        "Surcharge": 0,
+        "EducationCess": 0,
+        "TotalTaxPayable": 0
+      },
+      "TaxPaid": { "TDS": 0, "AdvanceTax": 0, "TotalTaxesPaid": 0 },
+      "Refund": { "RefundDue": 0 }
+    }
+  }
+}

@@ -1,7 +1,9 @@
-"""Document upload + OCR + Form 16 extraction.
+"""Document upload + OCR + Form 16 / ITR extraction.
 
 Phase 0: AutoGen retired; OCR-only stub.
 Phase 2: detect Form 16, run structured extraction, persist `Form16` row.
+Phase 3: dedicated ``/upload-itr`` endpoint for previous-year ITR PDF/JSON
+         imports — feeds the ingestion agent so a new filing can be pre-filled.
 """
 import os
 import shutil
@@ -12,8 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.api.auth import get_current_active_user
 from app.database import get_db
-from app.models import Form16, User
+from app.models import Form16, ITRImport, User
 from app.services.form16_extractor import extract_form16, is_form16
+from app.services.itr_extractor import parse_itr_json_text, parse_itr_pdf
 from app.services.ocr import process_document, UPLOAD_DIR
 
 router = APIRouter(
@@ -98,4 +101,104 @@ async def upload_document(
         "stored_path": file_path,
         "raw_text_preview": (raw_text[:500] + "...") if len(raw_text) > 500 else raw_text,
         "extraction_status": "ocr_only",
+    }
+
+
+@router.post("/upload-itr")
+async def upload_previous_itr(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a previous year's ITR (PDF or JSON) and parse it for prefill.
+
+    Accepts ``application/json`` payloads (the IT Department's own ITR JSON
+    schema) or a ``.pdf`` (filed acknowledgement / full return).
+    """
+    user_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
+    os.makedirs(user_dir, exist_ok=True)
+
+    original_name = file.filename or "itr-upload"
+    file_ext = os.path.splitext(original_name)[1].lower()
+    if file_ext not in (".pdf", ".json"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only .pdf or .json ITR files are accepted on this endpoint.",
+        )
+
+    stored_name = f"{uuid.uuid4()}{file_ext}"
+    stored_path = os.path.join(user_dir, stored_name)
+    with open(stored_path, "wb") as buf:
+        shutil.copyfileobj(file.file, buf)
+
+    if file_ext == ".json":
+        try:
+            with open(stored_path, "r", encoding="utf-8") as fh:
+                raw = fh.read()
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Could not read uploaded file: {e}")
+        result = parse_itr_json_text(raw)
+        source_format = "json"
+    else:
+        result = parse_itr_pdf(stored_path)
+        source_format = "pdf"
+
+    record = ITRImport(
+        user_id=current_user.id,
+        source_filename=original_name,
+        source_format=source_format,
+        stored_path=stored_path,
+        assessment_year=result.assessment_year,
+        form_type=result.form_type,
+        pan=result.pan,
+        name=result.name,
+        regime=result.regime,
+        gross_salary=result.gross_salary,
+        house_property_income=result.house_property_income,
+        capital_gains=result.capital_gains,
+        business_income=result.business_income,
+        other_income=result.other_income,
+        deductions_80c=result.deductions_80c,
+        deductions_80d=result.deductions_80d,
+        deductions_other=result.deductions_other,
+        taxable_income=result.taxable_income,
+        total_tax=result.total_tax,
+        tds_paid=result.tds_paid,
+        refund_due=result.refund_due,
+        tax_due=result.tax_due,
+        raw_text=result.raw_text,
+        parsed_payload=result.raw_payload,
+        extraction_status=result.extraction_status,
+        extraction_confidence=result.extraction_confidence,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return {
+        "id": record.id,
+        "filename": original_name,
+        "source_format": source_format,
+        "extraction_status": result.extraction_status,
+        "extraction_confidence": result.extraction_confidence,
+        "extracted_fields": {
+            "assessment_year": result.assessment_year,
+            "form_type": result.form_type,
+            "pan": result.pan,
+            "name": result.name,
+            "regime": result.regime,
+            "gross_salary": result.gross_salary,
+            "house_property_income": result.house_property_income,
+            "capital_gains": result.capital_gains,
+            "business_income": result.business_income,
+            "other_income": result.other_income,
+            "deductions_80c": result.deductions_80c,
+            "deductions_80d": result.deductions_80d,
+            "deductions_other": result.deductions_other,
+            "taxable_income": result.taxable_income,
+            "total_tax": result.total_tax,
+            "tds_paid": result.tds_paid,
+            "refund_due": result.refund_due,
+            "tax_due": result.tax_due,
+        },
     }

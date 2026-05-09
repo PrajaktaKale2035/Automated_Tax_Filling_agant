@@ -416,11 +416,31 @@ def _serialize_result(thread_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+async def _invoke_graph_with_retry(state, config):
+    """Invoke the LangGraph workflow once; retry once on transient PG drops.
+
+    Background: on Windows, idle psycopg sockets can be aborted by the OS or
+    by Postgres itself (error 10053). We refresh the pool and retry once
+    before surfacing the error to the user.
+    """
+    from app.agents_v2.graph import (
+        tax_filing_graph,
+        is_transient_pg_error,
+        refresh_pool,
+    )
+    try:
+        return await tax_filing_graph.ainvoke(state, config=config)
+    except Exception as e:
+        if not is_transient_pg_error(e):
+            raise
+        await refresh_pool()
+        return await tax_filing_graph.ainvoke(state, config=config)
+
+
 @router.post("/filing/chat/start")
 async def chat_start(req: ChatStartRequest):
     """Start a chat-driven filing session via LangGraph."""
     from langchain_core.messages import HumanMessage
-    from app.agents_v2.graph import tax_filing_graph
     import uuid as _uuid
 
     thread_id = f"tax-{req.user_id}-{_uuid.uuid4().hex[:8]}"
@@ -432,7 +452,7 @@ async def chat_start(req: ChatStartRequest):
         "tax_draft": {},
     }
     try:
-        result = await tax_filing_graph.ainvoke(initial_state, config=config)
+        result = await _invoke_graph_with_retry(initial_state, config)
     except Exception as e:
         msg = str(e)
         if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
@@ -446,6 +466,12 @@ async def chat_start(req: ChatStartRequest):
             raise HTTPException(status_code=503, detail=(
                 "Gemini model is temporarily overloaded by Google. Retry in ~30s."
             ))
+        from app.agents_v2.graph import is_transient_pg_error
+        if is_transient_pg_error(e):
+            raise HTTPException(status_code=503, detail=(
+                "Database connection dropped while running the agent graph. "
+                "Please retry — the connection pool has been refreshed."
+            ))
         raise HTTPException(status_code=500, detail=f"graph execution failed: {msg}")
     return _serialize_result(thread_id, result)
 
@@ -454,24 +480,33 @@ async def chat_start(req: ChatStartRequest):
 async def chat_message(req: ChatMessageRequest):
     """Continue a chat-driven filing session."""
     from langchain_core.messages import HumanMessage
-    from app.agents_v2.graph import tax_filing_graph
+    from app.agents_v2.graph import (
+        tax_filing_graph,
+        is_transient_pg_error,
+        refresh_pool,
+    )
 
     config = {"configurable": {"thread_id": req.thread_id}}
 
-    # Verify thread exists before invoking
-    try:
-        snapshot = await tax_filing_graph.aget_state(config)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"failed to load thread: {e}")
+    # Verify thread exists before invoking. Retry once on transient drops.
+    snapshot = None
+    for attempt in (1, 2):
+        try:
+            snapshot = await tax_filing_graph.aget_state(config)
+            break
+        except Exception as e:
+            if attempt == 1 and is_transient_pg_error(e):
+                await refresh_pool()
+                continue
+            raise HTTPException(status_code=500, detail=f"failed to load thread: {e}")
     if not snapshot or not snapshot.values:
         raise HTTPException(status_code=404, detail=f"thread {req.thread_id} not found")
 
-    # Pass only the new message — InMemorySaver loads the checkpoint state and
-    # the add_messages reducer appends the new message to the existing history.
+    # Pass only the new message — the add_messages reducer appends to history.
     try:
-        result = await tax_filing_graph.ainvoke(
+        result = await _invoke_graph_with_retry(
             {"messages": [HumanMessage(content=req.message)]},
-            config=config,
+            config,
         )
     except Exception as e:
         msg = str(e)
@@ -485,6 +520,11 @@ async def chat_message(req: ChatMessageRequest):
         if "UNAVAILABLE" in msg or "503" in msg:
             raise HTTPException(status_code=503, detail=(
                 "Gemini model is temporarily overloaded by Google. Retry in ~30s."
+            ))
+        if is_transient_pg_error(e):
+            raise HTTPException(status_code=503, detail=(
+                "Database connection dropped while running the agent graph. "
+                "Please retry — the connection pool has been refreshed."
             ))
         raise HTTPException(status_code=500, detail=f"graph execution failed: {msg}")
     return _serialize_result(req.thread_id, result)

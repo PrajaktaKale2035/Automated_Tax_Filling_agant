@@ -36,8 +36,16 @@ export function useSdui() {
     loading.value = true
     error.value = null
     try {
-      const resp = await fetch(`${API_BASE}/sdui/form?type=${formType}`)
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const resp = await fetch(`${API_BASE}/api/sdui/form?type=${formType}`)
+      if (!resp.ok) {
+        // The form endpoint is optional — wizard falls back to its hard-coded
+        // step config when missing, so a 404 should not produce a noisy error.
+        if (resp.status === 404) {
+          formSchema.value = null
+          return
+        }
+        throw new Error(`HTTP ${resp.status}`)
+      }
       formSchema.value = await resp.json()
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to load form schema'
@@ -46,11 +54,11 @@ export function useSdui() {
     }
   }
 
-  async function fetchDashboardSchema() {
+  async function fetchDashboardSchema(userId: number | string) {
     loading.value = true
     error.value = null
     try {
-      const resp = await fetch(`${API_BASE}/sdui/dashboard`)
+      const resp = await fetch(`${API_BASE}/api/sdui/dashboard/${userId}`)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       dashboardSchema.value = await resp.json()
     } catch (e: any) {

@@ -1,0 +1,105 @@
+{
+  "_comment": "Sample ITR-1 (Sahaj) JSON shaped like the IT Dept schema. AY 2024-25, salaried filer, new regime. Upload at /documents -> 'Upload last year's ITR' to test the ingestion agent.",
+  "ITR": {
+    "ITR1": {
+      "Form_ITR1": {
+        "FormName": "ITR-1",
+        "Description": "For Indls having Income from Salary, One House Property, Other sources (Interest etc.) and having total income upto Rs.50 lakh",
+        "AssessmentYear": "2024-25",
+        "SchemaVer": "Ver1.0",
+        "FormVer": "Ver1.0"
+      },
+      "PersonalInfo": {
+        "AssesseeName": {
+          "FirstName": "Rohit",
+          "MiddleName": "Kumar",
+          "SurNameOrOrgName": "Sharma"
+        },
+        "PAN": "ABCPS1234F",
+        "Address": {
+          "ResidenceNo": "12",
+          "RoadOrStreet": "MG Road",
+          "Locality": "Indiranagar",
+          "CityOrTownOrDistrict": "Bengaluru",
+          "StateCode": "29",
+          "CountryCode": "91",
+          "PinCode": 560038,
+          "MobileNo": 9876543210,
+          "EmailAddress": "rohit.sharma@example.com"
+        },
+        "DOB": "1990-04-15",
+        "AadhaarCardNo": "123456789012"
+      },
+      "FilingStatus": {
+        "ReturnFileSec": 11,
+        "OptingNewTaxRegime": "Y"
+      },
+      "ITR1_IncomeDeductions": {
+        "GrossSalary": 1250000,
+        "Salary": 1250000,
+        "AllwncExemptUs10": 0,
+        "DeductionUs16": 75000,
+        "DeductionUs16ia": 75000,
+        "IncomeFromSal": 1175000,
+        "TotalIncomeOfHP": 0,
+        "IncomeFromHP": 0,
+        "OthersInc": {
+          "OthersIncDtlsOthSrc": [
+            { "OthSrcNatureDesc": "Bank Interest", "OthSrcOthAmount": 18000 }
+          ]
+        },
+        "IncomeOthSrc": 18000,
+        "GrossTotIncome": 1193000,
+        "DeductUndChapVIA": {
+          "Section80C": 150000,
+          "Section80CCC": 0,
+          "Section80CCDEmployeeOrSE": 0,
+          "Section80CCD1B": 0,
+          "Section80D": 25000,
+          "Section80E": 0,
+          "Section80G": 0,
+          "Section80TTA": 10000,
+          "TotalChapVIADeductions": 0
+        },
+        "TotalIncome": 1193000
+      },
+      "ITR1_TaxComputation": {
+        "TaxPayableOnTotalInc": 122550,
+        "Rebate87A": 0,
+        "TaxPayableOnRebate": 122550,
+        "Surcharge": 0,
+        "EducationCess": 4902,
+        "GrossTaxLiability": 127452,
+        "TaxRelief": { "TotTaxRelief": 0 },
+        "NetTaxLiability": 127452,
+        "TotalIntrstPay": 0,
+        "TotTaxPlusIntrstPay": 127452,
+        "TotalTaxPayable": 127452
+      },
+      "TaxPaid": {
+        "TaxesPaid": {
+          "TDS": 130000,
+          "TCS": 0,
+          "AdvanceTax": 0,
+          "SelfAssessmentTax": 0,
+          "TotalTaxesPaid": 130000
+        },
+        "BalTaxPayable": 0
+      },
+      "Refund": {
+        "RefundDue": 2548,
+        "BankAccountDtls": {
+          "AddtnlBankDetails": [
+            { "IFSCCode": "HDFC0001234", "BankName": "HDFC Bank", "BankAccountNo": "12345678901234", "AccountType": "SB" }
+          ]
+        }
+      },
+      "Verification": {
+        "Declaration": { "AssesseeVerName": "Rohit Kumar Sharma", "FatherName": "Rakesh Sharma", "AssesseeVerPAN": "ABCPS1234F" },
+        "Capacity": "S",
+        "Place": "Bengaluru",
+        "Date": "2024-07-30"
+      }
+    }
+  }
+}

@@ -352,8 +352,8 @@
             </CardContent>
           </Card>
 
-          <!-- Quick tips -->
-          <Card class="flex-1 overflow-y-auto">
+          <!-- Quick tips (hidden in intermediate mode for a denser layout) -->
+          <Card v-if="showHelp" class="flex-1 overflow-y-auto">
             <CardHeader class="pb-2">
               <CardTitle class="text-sm font-medium">Quick Guide</CardTitle>
             </CardHeader>
@@ -409,6 +409,34 @@ const { formSchema, fetchFormSchema } = useSdui()
 
 onMounted(() => {
   fetchFormSchema('filing')
+
+  // Hydrate formData from query params produced by NewFiling.vue prefill flow
+  // (Form 16 OCR + previous-year ITR import). Numbers are passed as strings.
+  const q = route.query
+  const num = (v: any): number | undefined => {
+    if (v == null) return undefined
+    const n = Number(v)
+    return Number.isFinite(n) ? n : undefined
+  }
+
+  const grossSalary = num(q.gross_salary)
+  if (grossSalary != null) formData.salary = grossSalary
+  const tds = num(q.tds_paid)
+  if (tds != null) formData.tds = tds
+  const s80c = num(q.section80c)
+  if (s80c != null) formData.section80c = s80c
+  const s80d = num(q.section80d)
+  if (s80d != null) formData.section80d = s80d
+  const cg = num(q.cg_equity)
+  if (cg != null) formData.cg_ltcg_equity = cg
+  const hp = num(q.house_income)
+  if (hp != null) formData.house_rental_income = hp
+  const bi = num(q.business_income)
+  if (bi != null) formData.business_net_profit = bi
+
+  if (q.regime === 'old' || q.regime === 'new') {
+    formData.regime = q.regime
+  }
 })
 
 const formStepConfigs: Record<string, Array<{ title: string; description: string; key: string }>> = {
@@ -442,6 +470,16 @@ const formStepConfigs: Record<string, Array<{ title: string; description: string
 }
 
 const selectedForm = computed(() => (route.query.form as string) || 'ITR-1')
+
+// Mode-driven density. Novice = full help; Intermediate = denser, hints
+// hidden by default; Expert never lands here (routes to /filing/grid). The
+// query param wins so a user can override via URL.
+const effectiveMode = computed(() => {
+  const q = route.query.mode
+  if (q === 'novice' || q === 'intermediate' || q === 'expert') return q
+  return authStore.mode || 'novice'
+})
+const showHelp = computed(() => effectiveMode.value !== 'intermediate')
 
 const steps = computed(() => {
   if (formSchema.value?.steps?.length) {

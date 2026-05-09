@@ -13,6 +13,32 @@ export interface Form16Data {
   fy?: string
 }
 
+/** Data extracted from a previous-year ITR PDF/JSON upload. Used to pre-fill
+ *  a fresh filing in the wizard or grid. */
+export interface ItrImportData {
+  id?: number
+  assessment_year?: string | null
+  form_type?: string | null
+  pan?: string | null
+  name?: string | null
+  regime?: 'old' | 'new' | string | null
+  gross_salary?: number
+  house_property_income?: number
+  capital_gains?: number
+  business_income?: number
+  other_income?: number
+  deductions_80c?: number
+  deductions_80d?: number
+  deductions_other?: number
+  taxable_income?: number
+  total_tax?: number
+  tds_paid?: number
+  refund_due?: number
+  tax_due?: number
+  extraction_confidence?: number
+  extraction_status?: string
+}
+
 /** A single RAG source returned by the backend alongside a chat reply. */
 export interface RagSource {
   id?: string | number
@@ -36,6 +62,11 @@ export const useAgentStore = defineStore('agent', () => {
   /** Form 16 OCR data stored after a successful upload in Documents.vue.
    *  NewFiling.vue reads this on mount to prefill salary/TDS fields. */
   const form16Data = ref<Form16Data | null>(null);
+
+  /** Previous-year ITR data (PDF/JSON) parsed by the ingestion agent.
+   *  Read by NewFiling.vue and merged with form16Data — Form 16 wins on
+   *  conflict because it's the authoritative current-year salary record. */
+  const itrImportData = ref<ItrImportData | null>(null);
 
   /** Latest RAG sources returned by the backend alongside a chat reply.
    *  Chat.vue reads this to populate the sources sidebar. */
@@ -234,6 +265,7 @@ export const useAgentStore = defineStore('agent', () => {
     lastResponse,
     currentProvider,
     form16Data,
+    itrImportData,
     ragSources,
 
     // Computed

@@ -160,10 +160,13 @@ import CardContent from '@/components-vue/ui/CardContent.vue'
 import Input from '@/components-vue/ui/Input.vue'
 import Label from '@/components-vue/ui/Label.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8000'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const activeTab = ref('general')
@@ -179,6 +182,29 @@ const formData = reactive({
   general: { firstName: '', middleName: '', lastName: '', pan: '', aadhaar: '', dob: '' },
   salary: { gross: 0, tds: 0 },
   deductions: { section80c: 0, section80d: 0 },
+})
+
+// Hydrate from query params (Form 16 OCR + previous-year ITR import).
+onMounted(() => {
+  const q = route.query
+  const num = (v: any): number | undefined => {
+    if (v == null) return undefined
+    const n = Number(v)
+    return Number.isFinite(n) ? n : undefined
+  }
+  const gs = num(q.gross_salary)
+  if (gs != null) formData.salary.gross = gs
+  const tds = num(q.tds_paid)
+  if (tds != null) formData.salary.tds = tds
+  const s80c = num(q.section80c)
+  if (s80c != null) formData.deductions.section80c = s80c
+  const s80d = num(q.section80d)
+  if (s80d != null) formData.deductions.section80d = s80d
+  if (q.regime === 'old' || q.regime === 'new') formData.regime = q.regime
+  if (typeof q.employer_name === 'string' && !formData.general.firstName) {
+    // No employer field in this grid; fold to firstName as a hint placeholder.
+  }
+  if (typeof q.pan === 'string') formData.general.pan = q.pan
 })
 
 interface TaxBreakdown {

@@ -47,13 +47,15 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  PieChart, 
-  Settings, 
+import {
+  LayoutDashboard,
+  FileText,
+  PieChart,
+  Settings,
   HelpCircle,
-  LogOut
+  LogOut,
+  MessageCircle,
+  Upload,
 } from 'lucide-vue-next';
 import Button from '@/components-vue/ui/Button.vue';
 import Card from '@/components-vue/ui/Card.vue';
@@ -70,6 +72,8 @@ const user = computed(() => authStore.user);
 const navigation = computed(() => [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', current: route.path === '/dashboard' },
   { name: 'My Filings', icon: FileText, path: '/filings', current: route.path === '/filings' },
+  { name: 'AI Chat', icon: MessageCircle, path: '/chat', current: route.path === '/chat' },
+  { name: 'Documents', icon: Upload, path: '/documents', current: route.path === '/documents' },
   { name: 'Reports', icon: PieChart, path: '/reports', current: route.path === '/reports' },
   { name: 'Settings', icon: Settings, path: '/settings', current: route.path === '/settings' },
   { name: 'Help & Support', icon: HelpCircle, path: '/help', current: route.path === '/help' },

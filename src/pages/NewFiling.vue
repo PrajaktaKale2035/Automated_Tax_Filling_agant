@@ -7,6 +7,16 @@
         <p class="text-muted-foreground">Choose Assessment Year and ITR form to start.</p>
       </div>
 
+      <div
+        v-if="prefillSource !== 'none'"
+        class="p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-900 flex items-center gap-2"
+      >
+        <span class="font-semibold">Prefill ready:</span>
+        <span v-if="prefillSource === 'form16'">Form 16 data will pre-populate salary &amp; TDS.</span>
+        <span v-else-if="prefillSource === 'itr'">Last year's ITR will seed income, deductions and regime.</span>
+        <span v-else>Form 16 + previous ITR will both pre-fill the form (Form 16 wins on salary).</span>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Assessment Year</CardTitle>
@@ -95,24 +105,51 @@ const agentStore = useAgentStore()
 const selectedAY = ref<string | null>('2025-26')
 const selectedForm = ref<string | null>('ITR-1')
 
-// Prefill fields from Form 16 OCR data captured in Documents.vue (if any).
-// These are passed as query params to the wizard so the downstream form can use them.
+// Prefill fields combined from Form 16 OCR (if any) + previous-year ITR
+// import (if any). Form 16 wins on conflict for current-year salary fields.
 const prefillGrossSalary = ref<number | null>(null)
 const prefillTdsPaid = ref<number | null>(null)
 const prefillEmployerName = ref<string | null>(null)
+const prefillSection80c = ref<number | null>(null)
+const prefillSection80d = ref<number | null>(null)
+const prefillRegime = ref<string | null>(null)
+const prefillCgEquity = ref<number | null>(null)
+const prefillHouseIncome = ref<number | null>(null)
+const prefillBusinessIncome = ref<number | null>(null)
+const prefillSource = ref<'none' | 'form16' | 'itr' | 'both'>('none')
 
 onMounted(() => {
+  let fromForm16 = false
+  let fromItr = false
+
+  if (agentStore.itrImportData) {
+    const d = agentStore.itrImportData
+    fromItr = true
+    if (d.gross_salary) prefillGrossSalary.value = d.gross_salary
+    if (d.tds_paid) prefillTdsPaid.value = d.tds_paid
+    if (d.deductions_80c) prefillSection80c.value = d.deductions_80c
+    if (d.deductions_80d) prefillSection80d.value = d.deductions_80d
+    if (d.house_property_income) prefillHouseIncome.value = d.house_property_income
+    if (d.capital_gains) prefillCgEquity.value = d.capital_gains
+    if (d.business_income) prefillBusinessIncome.value = d.business_income
+    if (d.regime) prefillRegime.value = String(d.regime)
+    if (d.form_type) selectedForm.value = d.form_type
+  }
+
   if (agentStore.form16Data) {
     const d = agentStore.form16Data
-    prefillGrossSalary.value = d.gross_salary ?? null
-    prefillTdsPaid.value = d.tds_paid ?? null
-    prefillEmployerName.value = d.employer_name ?? null
-    // Auto-select AY from FY if present (e.g. "2024-25" → AY "2025-26")
-    if (d.fy && !selectedAY.value) {
+    fromForm16 = true
+    // Form 16 is current-year authoritative — overrides ITR import.
+    if (d.gross_salary != null) prefillGrossSalary.value = d.gross_salary
+    if (d.tds_paid != null) prefillTdsPaid.value = d.tds_paid
+    if (d.employer_name) prefillEmployerName.value = d.employer_name
+    if (d.fy && !agentStore.itrImportData?.assessment_year) {
       const [startYear] = d.fy.split('-')
       if (startYear) selectedAY.value = `${Number(startYear) + 1}-${String(Number(startYear) + 2).slice(-2)}`
     }
   }
+
+  prefillSource.value = fromForm16 && fromItr ? 'both' : fromForm16 ? 'form16' : fromItr ? 'itr' : 'none'
 })
 
 const assessmentYears = [
@@ -130,20 +167,27 @@ const itrForms = [
 
 const startFiling = () => {
   if (!selectedAY.value || !selectedForm.value) return
+  const prefillQuery = {
+    ay: selectedAY.value,
+    form: selectedForm.value,
+    mode: authStore.mode,
+    ...(prefillGrossSalary.value != null ? { gross_salary: String(prefillGrossSalary.value) } : {}),
+    ...(prefillTdsPaid.value != null ? { tds_paid: String(prefillTdsPaid.value) } : {}),
+    ...(prefillEmployerName.value != null ? { employer_name: prefillEmployerName.value } : {}),
+    ...(prefillSection80c.value != null ? { section80c: String(prefillSection80c.value) } : {}),
+    ...(prefillSection80d.value != null ? { section80d: String(prefillSection80d.value) } : {}),
+    ...(prefillRegime.value ? { regime: prefillRegime.value } : {}),
+    ...(prefillCgEquity.value != null ? { cg_equity: String(prefillCgEquity.value) } : {}),
+    ...(prefillHouseIncome.value != null ? { house_income: String(prefillHouseIncome.value) } : {}),
+    ...(prefillBusinessIncome.value != null ? { business_income: String(prefillBusinessIncome.value) } : {}),
+    ...(prefillSource.value !== 'none' ? { prefill_from: prefillSource.value } : {}),
+  }
   if (authStore.mode === 'expert') {
-    router.push('/filing/grid')
+    router.push({ path: '/filing/grid', query: prefillQuery })
   } else {
     router.push({
       path: '/filing/wizard',
-      query: {
-        context: 'new_filing',
-        ay: selectedAY.value,
-        form: selectedForm.value,
-        // Pass Form 16 prefill values to the wizard so it can populate fields.
-        ...(prefillGrossSalary.value != null ? { gross_salary: String(prefillGrossSalary.value) } : {}),
-        ...(prefillTdsPaid.value != null ? { tds_paid: String(prefillTdsPaid.value) } : {}),
-        ...(prefillEmployerName.value != null ? { employer_name: prefillEmployerName.value } : {}),
-      },
+      query: { context: 'new_filing', ...prefillQuery },
     })
   }
 }

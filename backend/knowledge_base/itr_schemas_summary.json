@@ -1,0 +1,81 @@
+{
+  "metadata": {
+    "source": "https://www.incometax.gov.in/iec/foportal/downloads/income-tax-returns",
+    "assessment_year": "AY 2025-26",
+    "download_date": "May 5, 2026",
+    "forms": [
+      "ITR-1",
+      "ITR-2",
+      "ITR-3",
+      "ITR-4",
+      "ITR-5",
+      "ITR-6",
+      "ITR-7"
+    ]
+  },
+  "forms": {
+    "ITR-1": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr1_schema.json"
+    },
+    "ITR-2": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr2_schema.json"
+    },
+    "ITR-3": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr3_schema.json"
+    },
+    "ITR-4": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr4_schema.json"
+    },
+    "ITR-5": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr5_schema.json"
+    },
+    "ITR-6": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr6_schema.json"
+    },
+    "ITR-7": {
+      "version": "N/A",
+      "description": "N/A",
+      "sections": [],
+      "total_fields": 0,
+      "required_fields_count": 0,
+      "required_fields": [],
+      "schema_file": "itr7_schema.json"
+    }
+  }
+}

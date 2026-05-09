@@ -134,6 +134,58 @@ class Form16(Base):
         return f"<Form16(id={self.id}, employer={self.employer_name}, ay={self.assessment_year})>"
 
 
+class ITRImport(Base):
+    """A previous-year ITR (PDF or JSON) uploaded by the user.
+
+    The ingestion agent parses it into normalized fields so a new filing can be
+    pre-populated. Stored alongside `Form16` rows but distinct because an ITR
+    return is a far broader document (full income statement, not just salary).
+    """
+    __tablename__ = "itr_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Source file metadata
+    source_filename = Column(String, nullable=True)
+    source_format = Column(String, nullable=False)        # "json" | "pdf"
+    stored_path = Column(String, nullable=True)
+
+    # Identifiers extracted from the return
+    assessment_year = Column(String, nullable=True)       # e.g. "2024-25"
+    form_type = Column(String(10), nullable=True)         # "ITR-1" | "ITR-2" | "ITR-4" | ...
+    pan = Column(String, nullable=True)
+    name = Column(String, nullable=True)
+    regime = Column(String, nullable=True)                # "old" | "new" | None
+
+    # Normalized line items (best-effort; default 0)
+    gross_salary = Column(Float, default=0.0)
+    house_property_income = Column(Float, default=0.0)
+    capital_gains = Column(Float, default=0.0)
+    business_income = Column(Float, default=0.0)
+    other_income = Column(Float, default=0.0)
+    deductions_80c = Column(Float, default=0.0)
+    deductions_80d = Column(Float, default=0.0)
+    deductions_other = Column(Float, default=0.0)
+    taxable_income = Column(Float, default=0.0)
+    total_tax = Column(Float, default=0.0)
+    tds_paid = Column(Float, default=0.0)
+    refund_due = Column(Float, default=0.0)
+    tax_due = Column(Float, default=0.0)
+
+    # Provenance
+    raw_text = Column(Text)                                # OCR/extracted text or raw JSON
+    parsed_payload = Column(JSON, default=dict)            # full structured parse
+    extraction_status = Column(String, default="parsed")   # parsed | review_required | failed
+    extraction_confidence = Column(Float, default=0.0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<ITRImport(id={self.id}, ay={self.assessment_year}, form={self.form_type})>"
+
+
 class ITR1Filing(Base):
     """A computed ITR-1 (Sahaj) filing draft."""
     __tablename__ = "itr1_filings"

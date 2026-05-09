@@ -53,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
             }
             localStorage.setItem('user', JSON.stringify(user.value))
         }
+        await loadModeFromBackend()
     }
 
     function logout() {
@@ -81,10 +82,46 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    const mode = ref<string>('novice')
+    const VALID_MODES = ['novice', 'intermediate', 'expert'] as const
+    const storedMode = localStorage.getItem('mode')
+    const initialMode = (VALID_MODES as readonly string[]).includes(storedMode || '')
+        ? (storedMode as string)
+        : 'novice'
+    const mode = ref<string>(initialMode)
+
+    async function loadModeFromBackend() {
+        if (!token.value) return
+        try {
+            const resp = await fetch(`${API_BASE}/api/users/me/profile`, {
+                headers: { Authorization: `Bearer ${token.value}` },
+            })
+            if (resp.ok) {
+                const profile = await resp.json()
+                if (profile?.preferred_mode && (VALID_MODES as readonly string[]).includes(profile.preferred_mode)) {
+                    mode.value = profile.preferred_mode
+                    localStorage.setItem('mode', profile.preferred_mode)
+                }
+            }
+        } catch {
+            // Profile may not exist yet; keep local default.
+        }
+    }
 
     function setMode(newMode: string) {
+        if (!(VALID_MODES as readonly string[]).includes(newMode)) return
         mode.value = newMode
+        localStorage.setItem('mode', newMode)
+        if (token.value) {
+            // Fire-and-forget — UI updates immediately; persistence is best-effort.
+            fetch(`${API_BASE}/api/users/me/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token.value}`,
+                },
+                body: JSON.stringify({ preferred_mode: newMode }),
+            }).catch(() => {})
+        }
     }
 
     return {
@@ -95,6 +132,7 @@ export const useAuthStore = defineStore('auth', () => {
         login,
         register,
         logout,
-        setMode
+        setMode,
+        loadModeFromBackend,
     }
 })
